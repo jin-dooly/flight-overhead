@@ -1,4 +1,4 @@
-import type { Snapshot, SourceStatus } from '@flight/shared';
+import type { Snapshot } from '@flight/shared';
 import { createAdsbFiSource } from './adsbFi';
 import { createAdsbLolSource } from './adsbLol';
 import type { AircraftSource, SourceOptions } from './types';
@@ -52,6 +52,3 @@ export const createDefaultFetcher = (opts: SourceOptions): SnapshotFetcher =>
 
 const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
-
-/** 상태 타입 재노출(서버 내부에서 shared를 직접 import하지 않아도 되게) */
-export type { SourceStatus };
