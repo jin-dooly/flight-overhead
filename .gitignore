@@ -1,0 +1,15 @@
+node_modules
+dist
+build
+coverage
+*.log
+.turbo
+*.tsbuildinfo
+.env
+.env*.local
+.vercel
+.DS_Store
+Thumbs.db
+.vscode
+.idea
+.claude
