@@ -17,7 +17,7 @@
 | `bfced22` | feat(server): Express /health, 환경 변수, 서버 시작 스크립트 추가 |
 | `5c8a20b` | chore: GitHub Actions CI 추가 (설치, 타입 체크, 테스트) |
 | `a50fd74` | chore(web): Vite + React + TS 기본 세팅, 지도/실시간 의존성 설치, shared import 확인 |
-| (마지막 커밋) | docs: 구독 스크립트, README, HANDOFF 추가 |
+| `d8f709a` | docs: 구독 확인 스크립트, README, 아침 보고서(HANDOFF) 추가 (이 표의 해시 수정은 별도 커밋) |
 
 **완료 기준 확인**
 
