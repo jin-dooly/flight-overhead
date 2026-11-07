@@ -1,0 +1,10 @@
+{
+  "aircraft": [
+    { "hex": "71be12", "type": "adsb_icao", "flight": "KAL1234 ", "alt_baro": 8325, "gs": 251.4, "track": 312.6, "lat": 37.53, "lon": 127.12, "seen_pos": 2.5 },
+    { "hex": "71bb01", "flight": "AAR8901", "alt_baro": "ground", "lat": 37.46, "lon": 126.44 },
+    { "hex": "~2c1a33", "type": "tisb_other", "lat": 37.6, "lon": 127.0 }
+  ],
+  "now": 1762534800,
+  "resultCount": 3,
+  "ptime": 0
+}

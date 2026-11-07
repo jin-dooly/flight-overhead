@@ -1,0 +1,13 @@
+{
+  "ac": [
+    { "hex": "71be12", "type": "adsb_icao", "flight": "KAL1234 ", "t": "B77W", "alt_baro": 8325, "alt_geom": 8600, "gs": 251.4, "track": 312.6, "lat": 37.53, "lon": 127.12, "seen_pos": 0.4, "seen": 0.2, "rssi": -20.1 },
+    { "hex": "71c4a0", "flight": "        ", "alt_baro": 2100, "gs": 160, "track": 140.2, "lat": 37.47, "lon": 127.05, "seen": 1.1 },
+    { "hex": "71bb01", "flight": "AAR8901", "alt_baro": "ground", "gs": 4.1, "track": 90, "lat": 37.46, "lon": 126.44, "seen_pos": 1.0 },
+    { "hex": "780abc", "flight": "CES5042", "alt_baro": 31000, "seen": 3.0 }
+  ],
+  "msg": "No error",
+  "now": 1762534800000,
+  "total": 4,
+  "ctime": 1762534800123,
+  "ptime": 0
+}

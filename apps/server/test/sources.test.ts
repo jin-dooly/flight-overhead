@@ -1,0 +1,153 @@
+import { describe, expect, it, vi } from 'vitest';
+import adsbFiSample from './fixtures/adsbFi.json';
+import adsbLolSample from './fixtures/adsbLol.json';
+import { createAdsbFiSource } from '../src/sources/adsbFi';
+import { createAdsbLolSource } from '../src/sources/adsbLol';
+import { normalizeAircraft } from '../src/sources/normalize';
+
+const NOW = 1_762_534_800_000;
+
+const jsonResponse = (body: unknown, status = 200) =>
+  new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
+
+const makeOpts = (fetchImpl: typeof fetch) => ({
+  userAgent: 'flight-overhead-test/0.1',
+  timeoutMs: 5000,
+  fetchImpl,
+  now: () => NOW,
+});
+
+describe('normalizeAircraft', () => {
+  it('필드를 공통 모델로 매핑하고 편명 공백을 제거한다', () => {
+    const raw = {
+      hex: 'abc123',
+      flight: ' KAL1 ',
+      alt_baro: 1000,
+      gs: 200,
+      track: 45,
+      lat: 1,
+      lon: 2,
+      seen_pos: 1.5,
+    };
+    expect(normalizeAircraft(raw, NOW)).toEqual({
+      hex: 'abc123',
+      callsign: 'KAL1',
+      altFt: 1000,
+      speedKt: 200,
+      trackDeg: 45,
+      lat: 1,
+      lon: 2,
+      seenAt: NOW - 1500,
+    });
+  });
+
+  it('seen_pos가 없으면 현재 시각을 seenAt으로 쓴다', () => {
+    expect(normalizeAircraft({ hex: 'a', lat: 1, lon: 2 }, NOW)?.seenAt).toBe(
+      NOW
+    );
+  });
+
+  it('빈 편명은 callsign을 두지 않는다', () => {
+    const a = normalizeAircraft({ hex: 'a', flight: '   ', lat: 1, lon: 2 }, NOW);
+    expect(a).not.toBeNull();
+    expect(a).not.toHaveProperty('callsign');
+  });
+
+  it('지상 기체, 위치 없는 항목, hex 없는 항목을 버린다', () => {
+    expect(
+      normalizeAircraft({ hex: 'a', lat: 1, lon: 2, alt_baro: 'ground' }, NOW)
+    ).toBeNull();
+    expect(normalizeAircraft({ hex: 'a', lat: 1 }, NOW)).toBeNull();
+    expect(normalizeAircraft({ hex: 'a', lon: 2 }, NOW)).toBeNull();
+    expect(normalizeAircraft({ lat: 1, lon: 2 }, NOW)).toBeNull();
+    expect(normalizeAircraft(null, NOW)).toBeNull();
+  });
+});
+
+describe('adsb.lol 어댑터', () => {
+  it('요청 URL과 User-Agent를 지정하고 ac 목록을 정규화한다', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(adsbLolSample));
+    const source = createAdsbLolSource(makeOpts(fetchImpl as typeof fetch));
+
+    const result = await source.fetchAircraft(37.5, 127.1, 15);
+
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [
+      string,
+      RequestInit,
+    ];
+    expect(url).toBe('https://api.adsb.lol/v2/lat/37.5/lon/127.1/dist/15');
+    expect((init.headers as Record<string, string>)['User-Agent']).toBe(
+      'flight-overhead-test/0.1'
+    );
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+
+    // 지상 기체(71bb01)와 위치 없는 항목(780abc)은 빠짐
+    expect(result.map((a) => a.hex)).toEqual(['71be12', '71c4a0']);
+    expect(result[0]).toEqual({
+      hex: '71be12',
+      callsign: 'KAL1234',
+      lat: 37.53,
+      lon: 127.12,
+      altFt: 8325,
+      speedKt: 251.4,
+      trackDeg: 312.6,
+      seenAt: NOW - 400,
+    });
+    expect(result[1]).not.toHaveProperty('callsign');
+    expect(result[1].seenAt).toBe(NOW);
+  });
+
+  it('2xx가 아닌 응답은 실패로 처리한다', async () => {
+    const source = createAdsbLolSource(
+      makeOpts((async () => jsonResponse({}, 429)) as typeof fetch)
+    );
+    await expect(source.fetchAircraft(37.5, 127.1, 15)).rejects.toThrow(
+      'HTTP 429'
+    );
+  });
+
+  it('JSON 파싱 실패와 목록 키 누락을 실패로 처리한다', async () => {
+    const badJson = createAdsbLolSource(
+      makeOpts((async () => new Response('<html>')) as typeof fetch)
+    );
+    await expect(badJson.fetchAircraft(37.5, 127.1, 15)).rejects.toThrow();
+
+    const wrongKey = createAdsbLolSource(
+      makeOpts((async () => jsonResponse({ aircraft: [] })) as typeof fetch)
+    );
+    await expect(wrongKey.fetchAircraft(37.5, 127.1, 15)).rejects.toThrow(
+      '"ac"'
+    );
+  });
+
+  it('네트워크 오류를 실패로 처리한다', async () => {
+    const source = createAdsbLolSource(
+      makeOpts((async () => {
+        throw new TypeError('fetch failed');
+      }) as typeof fetch)
+    );
+    await expect(source.fetchAircraft(37.5, 127.1, 15)).rejects.toThrow(
+      'fetch failed'
+    );
+  });
+});
+
+describe('adsb.fi 어댑터', () => {
+  it('요청 URL을 만들고 aircraft 목록을 정규화한다', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(adsbFiSample));
+    const source = createAdsbFiSource(makeOpts(fetchImpl as typeof fetch));
+
+    const result = await source.fetchAircraft(37.5, 127.1, 15);
+
+    const [url] = fetchImpl.mock.calls[0] as unknown as [string];
+    expect(url).toBe(
+      'https://opendata.adsb.fi/api/v2/lat/37.5/lon/127.1/dist/15'
+    );
+    expect(result.map((a) => a.hex)).toEqual(['71be12', '~2c1a33']);
+    expect(result[0].seenAt).toBe(NOW - 2500);
+    expect(result[0].callsign).toBe('KAL1234');
+  });
+});
