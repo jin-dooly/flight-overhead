@@ -5,8 +5,8 @@ coverage
 *.log
 .turbo
 *.tsbuildinfo
-.env
-.env*.local
+.env*
+!.env.example
 .vercel
 .DS_Store
 Thumbs.db
