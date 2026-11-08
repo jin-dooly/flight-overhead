@@ -4,6 +4,10 @@
 export const MQTT_URL: string =
   import.meta.env.VITE_MQTT_URL?.trim() || 'ws://localhost:4000/mqtt';
 
+// 지도에 보여 주는 반경(km). 기획서의 "내 위치 상공 20km". 바깥 원(20km)과 안쪽 원(10km)도 이 값을 씀.
+// 서버는 격자 중심에서 17해리(약 31km)를 받아 오므로, 격자 안 어디에 있어도 20km 안 비행기는 다 들어 있음
+export const RADIUS_KM = 20;
+
 // 위치 권한이 없거나 위치를 못 얻었을 때 쓰는 기본 위치.
 // 인천공항은 낮에도 밤에도 비행기가 가장 많이 지나는 곳이라,
 // 권한을 거절한 사람도 빈 지도가 아니라 움직이는 비행기를 보게 됨

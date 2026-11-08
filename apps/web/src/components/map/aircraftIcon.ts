@@ -18,6 +18,14 @@ export function createAircraftIcon(callsign?: string) {
   });
 }
 
+/** 편명이 나중에 생기거나 바뀌면 라벨만 고침. 아이콘을 새로 만들면 DOM이 바뀌어 회전 상태가 사라지므로 */
+export function setCallsign(marker: L.Marker, callsign?: string) {
+  const label = marker
+    .getElement()
+    ?.querySelector<HTMLElement>('.aircraft-label');
+  if (label) label.textContent = callsign ?? '';
+}
+
 export function setRotation(marker: L.Marker, trackDeg?: number) {
   const rotor = marker
     .getElement()

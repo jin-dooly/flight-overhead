@@ -1,6 +1,6 @@
 import 'leaflet/dist/leaflet.css';
 import type { Map as LeafletMap } from 'leaflet';
-import { useEffect, useRef, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, type RefObject } from 'react';
 import {
   Circle,
   CircleMarker,
@@ -8,9 +8,10 @@ import {
   TileLayer,
   useMap,
 } from 'react-leaflet';
-import { DEFAULT_LOCATION } from '../config';
-import { AircraftLayer } from '../map/AircraftLayer';
-import { MOCK_AIRCRAFT } from '../mock/aircraft';
+import { AircraftLayer } from '../components/map/AircraftLayer';
+import { DEFAULT_LOCATION, RADIUS_KM } from '../config';
+import { sortByDistance } from '../lib/geo/distance';
+import { useFlightsStore } from '../store/flights';
 import { useLocationStore } from '../store/location';
 
 const MAP_ZOOM = 10;
@@ -36,7 +37,7 @@ export const MapPage = ({ onOpenSky }: { onOpenSky: () => void }) => {
         />
         <LocationSync />
         <MyLocationLayer />
-        <AircraftLayer aircraft={MOCK_AIRCRAFT} onSelect={() => {}} />
+        <NearbyAircraftLayer />
       </MapContainer>
 
       {/* 지도 위 버튼은 MapContainer 밖에 둠. 안에 두면 버튼 클릭이 지도 끌기, 더블클릭 확대로 새어 나감 */}
@@ -104,6 +105,32 @@ const overlayStyle = {
   gap: 4,
 } as const;
 
+const selectAircraft = (hex: string) =>
+  useFlightsStore.setState({ selectedHex: hex });
+
+/**
+ * 받은 스냅샷에서 내 위치 기준 반경 20km 안 비행기만 골라 지도에 그림.
+ * 서버는 격자 중심 기준 약 31km를 보내 주므로, 내 정확한 위치 기준으로 다시 자름
+ * (정확한 위치는 서버에 보내지 않으므로 이 계산은 브라우저에서만 할 수 있음)
+ */
+const NearbyAircraftLayer = () => {
+  const snapshot = useFlightsStore((s) => s.snapshot);
+  const lat = useLocationStore((s) => s.lat);
+  const lon = useLocationStore((s) => s.lon);
+
+  // 셀렉터 안에서 filter하면 매번 새 배열이 나와 무한히 다시 그리게 되므로,
+  // 스냅샷과 위치만 꺼내고 계산은 useMemo에서 함. 둘 중 하나가 바뀔 때만 다시 계산
+  const nearby = useMemo(
+    () =>
+      sortByDistance(snapshot?.aircraft ?? [], { lat, lon })
+        .filter((r) => r.distanceKm <= RADIUS_KM)
+        .map((r) => r.item),
+    [snapshot, lat, lon]
+  );
+
+  return <AircraftLayer aircraft={nearby} onSelect={selectAircraft} />;
+};
+
 /**
  * 스토어의 위치가 바뀌면 지도를 날아가듯 옮김. 처음 내 위치를 얻었을 때도 인천공항에서
  * 내 위치로 이동하는 모습을 보여 줌.
@@ -169,13 +196,13 @@ const MyLocationLayer = () => {
     <>
       <Circle
         center={center}
-        radius={20_000}
+        radius={RADIUS_KM * 1000}
         interactive={false}
         pathOptions={{ weight: 1, fillOpacity: 0.03 }}
       />
       <Circle
         center={center}
-        radius={10_000}
+        radius={(RADIUS_KM / 2) * 1000}
         interactive={false}
         pathOptions={{ weight: 1, fillOpacity: 0.05 }}
       />
