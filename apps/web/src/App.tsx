@@ -1,20 +1,30 @@
-import { snapshotTopic, toGrid, type Snapshot } from '@flight/shared'
+import { useEffect } from 'react';
+import { useMode } from './hooks/useMode';
+import { MapPage } from './pages/MapPage';
+import { SkyPage } from './pages/SkyPage';
+import { useLocationStore } from './store/location';
 
-// 기본 위치(송파구)의 격자 토픽. 지도와 구독 로직은 다음 단계에서 구현
-const DEFAULT_GRID = toGrid(37.5145, 127.1059)
-const DEFAULT_TOPIC = snapshotTopic(DEFAULT_GRID.lat, DEFAULT_GRID.lon)
-
-// shared 타입 import가 타입 체크를 통과하는지 확인하기 위한 빈 스냅샷
-const emptySnapshot: Snapshot = { aircraft: [], source: 'adsb.lol', fetchedAt: 0 }
-
+// App은 어떤 모드를 보여 줄지만 정함. 지도는 MapPage 안에만 있어서
+// 하늘 모드에서는 지도가 아예 그려지지 않음.
+// 두 모드가 같이 쓰는 위치(그리고 나중에 MQTT 연결)는 스토어에 둠.
 function App() {
+  const [mode, setMode] = useMode();
+  const requestLocation = useLocationStore((s) => s.requestLocation);
+
+  // "내 머리 위"가 핵심이라 처음 들어오자마자 내 위치를 요청함
+  useEffect(() => {
+    requestLocation();
+  }, [requestLocation]);
+
   return (
     <main>
-      <p>
-        내 머리 위 비행기 · 준비 중 ({DEFAULT_TOPIC}, {emptySnapshot.aircraft.length}대)
-      </p>
+      {mode === 'sky' ? (
+        <SkyPage onBack={() => window.history.back()} />
+      ) : (
+        <MapPage onOpenSky={() => setMode('sky')} />
+      )}
     </main>
-  )
+  );
 }
 
-export default App
+export default App;
