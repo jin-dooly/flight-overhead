@@ -10,6 +10,7 @@ describe('loadConfig', () => {
       userAgent: 'flight-overhead/0.1',
       requestTimeoutMs: 5000,
       maxPollIntervalMs: 60_000,
+      maxFollows: 20,
     });
   });
 

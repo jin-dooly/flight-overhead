@@ -59,6 +59,7 @@ describe('서버 통합', () => {
     expect(await health(port)).toEqual({
       status: 'ok',
       activeGrids: 0,
+      activeFollows: 0,
       source: 'ok',
     });
   });
@@ -88,6 +89,7 @@ describe('서버 통합', () => {
     expect(await health(port)).toEqual({
       status: 'ok',
       activeGrids: 1,
+      activeFollows: 0,
       source: 'fallback',
     });
 

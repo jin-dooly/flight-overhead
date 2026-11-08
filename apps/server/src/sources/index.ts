@@ -1,9 +1,10 @@
-import type { Snapshot } from '@flight/shared';
+import type { FollowSnapshot, Snapshot } from '@flight/shared';
+import type { PollResult } from '../topicPoller';
 import { createAdsbFiSource } from './adsbFi';
 import { createAdsbLolSource } from './adsbLol';
-import type { AircraftSource, SourceOptions } from './types';
+import type { AircraftSource, HexSource, SourceOptions } from './types';
 
-export type { AircraftSource, SourceOptions } from './types';
+export type { AircraftSource, HexSource, SourceOptions } from './types';
 export { createAdsbFiSource, createAdsbLolSource };
 
 export type FetchResult =
@@ -49,6 +50,41 @@ export const createFallbackFetcher = (
 
 export const createDefaultFetcher = (opts: SourceOptions): SnapshotFetcher =>
   createFallbackFetcher(createAdsbLolSource(opts), createAdsbFiSource(opts));
+
+export type FollowFetcher = (hex: string) => Promise<PollResult<FollowSnapshot>>;
+
+/**
+ * 따라가기용 예비 전환. 격자와 같은 규칙: 메인 실패(네트워크, 타임아웃, 2xx 아님, 형식 오류) 시 예비 소스.
+ * 응답은 왔지만 그 기체가 없으면 실패가 아니라 `aircraft: null`(신호 끊김)로 발행함
+ */
+export const createFallbackHexFetcher = (
+  primary: HexSource,
+  fallback: HexSource,
+  now: () => number = Date.now
+): FollowFetcher => {
+  return async (hex) => {
+    const errors: string[] = [];
+    const sources: [HexSource, 'ok' | 'fallback'][] = [
+      [primary, 'ok'],
+      [fallback, 'fallback'],
+    ];
+    for (const [source, status] of sources) {
+      try {
+        const aircraft = await source.fetchByHex(hex);
+        return {
+          status,
+          payload: { hex, aircraft, source: source.name, fetchedAt: now() },
+        };
+      } catch (err) {
+        errors.push(`${source.name}: ${errorMessage(err)}`);
+      }
+    }
+    return { status: 'degraded', payload: null, errors };
+  };
+};
+
+export const createDefaultFollowFetcher = (opts: SourceOptions): FollowFetcher =>
+  createFallbackHexFetcher(createAdsbLolSource(opts), createAdsbFiSource(opts));
 
 const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
