@@ -106,6 +106,12 @@ apps/server/scripts/sub.ts
 - 서버 `start`가 `tsx`로 실행하므로 `tsx`를 devDependencies에서 dependencies로 옮김 (Render에서 운영용 설치를 해도 서버가 뜨게).
 - 프론트 MQTT 주소는 `VITE_MQTT_URL`(`apps/web/src/config.ts`의 `MQTT_URL`). 비워 두면 `ws://localhost:4000/mqtt`, 배포에서는 Vercel 환경 변수에 `wss://<서버>/mqtt`.
 
+**프론트 폴더 구조** (2026-11-08, 사용자 결정)
+
+- `apps/web/src`는 유형별로 나눔: `pages/`(화면), `components/`(화면에 그려지는 것. React가 아니어도 포함, 예: Leaflet 마커 아이콘 `components/map/aircraftIcon.ts`), `hooks/`(훅), `store/`(zustand 스토어), `lib/`(화면과 상관없는 로직과 연결: MQTT 연결 `mqtt.ts`, 거리와 보간 `geo/`). 파일이 30개 안팎이라 규칙이 단순한 쪽을 골랐고, 기능이 많아지면 기능별 구조로 옮기는 것을 다시 검토.
+- 보간 예측은 마지막 위치를 받은 뒤 최대 30초까지만 진행하고 멈춤(`MAX_PREDICT_MS`, 서버 백오프 최대 60초의 절반). 예측은 평면 근사(30초 이동 거리에서 구면 공식과 수 m 차이), 수렴은 1초 동안 선형으로 차이를 줄임.
+- web 테스트는 서버처럼 `apps/web/test/`에 둠. Vitest는 서버와 같은 3.2.7. Vitest 3은 자체 Vite 7을 써서 Vite 8용 React 플러그인이 있는 `vite.config.ts` 대신 별도 `vitest.config.ts`를 둠.
+
 ## 4. 확인 필요 (판단이 필요한 것)
 
 1. **실제 비행기가 있는 응답으로 정규화 확인.** 새벽이라 0대였습니다. 낮에 서버를 띄우고 `pnpm --filter @flight/server sub`를 한 번 실행해서 비행기 수와 편명이 나오는지 봐 주세요. 필드 이름이 다르면 `apps/server/src/sources/normalize.ts`만 고치면 됩니다.
