@@ -2,13 +2,34 @@
 
 내 위치 상공(반경 20km)을 지나는 비행기를 지도 위에 실시간으로 보여주는 웹 서비스입니다. 기획 의도와 범위는 [`docs/PLAN.md`](docs/PLAN.md)에 있습니다.
 
-> 현재 상태: 서버 완성, 프론트엔드는 기본 세팅만 되어 있습니다.
+- 서비스: https://flight-overhead.vercel.app
+- 서버: https://flight-overhead.onrender.com/health (Render 무료 플랜이라 한동안 접속이 없으면 잠들어, 첫 접속은 1분 가까이 걸릴 수 있습니다)
+
+## 기능
+
+- 반경 20km 안 비행기를 진행 방향으로 회전한 아이콘과 편명으로 표시하고, 약 6초마다 실시간 갱신
+- 갱신 사이에도 속도와 방향으로 위치를 예측해 매 프레임 부드럽게 이동 (새 데이터가 오면 1초 동안 새 경로로 합류)
+- 하단 카드: 선택한 비행기(선택 전에는 가장 가까운 비행기)의 편명, 고도, 속도, 방향, 나와의 거리
+- 처음 들어오면 내 위치를 요청하고, 권한이 없으면 인천공항 기준으로 보여 줌
+- 상태 표시: 실시간 / 연결 중 / 재연결 중(마지막 위치를 흐리게) / 데이터 지연("N초 전 기준")
+- 반경 안에 비행기가 없으면 가장 가까운 비행기까지의 거리와 "반경 30km까지 넓히기"
+- 데이터 소스 장애 시 adsb.lol → adsb.fi 자동 전환
+
+## 핵심 구현
+
+| 주제 | 어디 | 한 줄 설명 |
+| --- | --- | --- |
+| 격자 토픽으로 호출 공유 | `packages/shared`, `apps/server/src/poller.ts` | 위치를 0.1도 격자로 반올림한 토픽을 구독. 같은 격자 사용자는 서버 조회 하나를 같이 받음 |
+| 예비 전환과 백오프 | `apps/server/src/sources`, `backoff.ts` | 메인 실패 시 예비 소스, 둘 다 실패하면 5→10→20→40→60초 |
+| 보간 애니메이션 | `apps/web/src/lib/geo/interpolate.ts`, `components/map/AircraftLayer.tsx` | React state를 거치지 않고 `requestAnimationFrame`에서 Leaflet 마커를 직접 이동 |
+| 시계 보정 | `apps/web/src/lib/mqtt.ts` | 스냅샷을 받을 때 "내 시계 - 서버 시계"를 기억해, 기기 시계가 틀려도 예측 위치가 어긋나지 않음 |
+| 개인정보 | `apps/web/src/hooks/useGridSubscription.ts` | 정확한 위치는 브라우저 안에서만 쓰고, 서버에는 격자 토픽만 보냄 |
 
 ## 구조
 
 ```
 apps/server     Express + Aedes 1.2.0(내장 MQTT 브로커) + ws
-apps/web        Vite + React + TypeScript (지도는 react-leaflet)
+apps/web        Vite + React + TypeScript (지도는 react-leaflet, 상태는 zustand)
 packages/shared 공통 타입(Aircraft, Snapshot), 토픽 이름, 격자 함수
 ```
 
