@@ -6,7 +6,7 @@ describe('loadConfig', () => {
     expect(loadConfig({})).toEqual({
       port: 4000,
       pollIntervalMs: 5000,
-      radiusNm: 15,
+      radiusNm: 17,
       userAgent: 'flight-overhead/0.1',
       requestTimeoutMs: 5000,
       maxPollIntervalMs: 60_000,
@@ -22,7 +22,7 @@ describe('loadConfig', () => {
     });
     expect(config.port).toBe(8080);
     expect(config.pollIntervalMs).toBe(5000);
-    expect(config.radiusNm).toBe(15);
+    expect(config.radiusNm).toBe(17);
     expect(config.userAgent).toBe('my-agent/1.0');
   });
 });

@@ -16,7 +16,7 @@ const positiveNumber = (value: string | undefined, fallback: number): number => 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): Config => ({
   port: positiveNumber(env.PORT, 4000),
   pollIntervalMs: positiveNumber(env.POLL_INTERVAL_MS, 5000),
-  radiusNm: positiveNumber(env.RADIUS_NM, 15),
+  radiusNm: positiveNumber(env.RADIUS_NM, 17),
   userAgent: env.USER_AGENT?.trim() || 'flight-overhead/0.1',
   // 아래 두 값은 기획서에서 확정된 값이라 환경 변수로 열지 않음
   requestTimeoutMs: 5000,

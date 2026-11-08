@@ -84,7 +84,7 @@ describe('서버 통합', () => {
     await waitFor(() => messages.size === 2);
     expect(JSON.parse(messages.get('flights/37.5/127.1')!)).toEqual(snapshot);
     expect(messages.get('status/source')).toBe('fallback');
-    expect(fetchSnapshot).toHaveBeenCalledWith(37.5, 127.1, 15);
+    expect(fetchSnapshot).toHaveBeenCalledWith(37.5, 127.1, 17);
     expect(await health(port)).toEqual({
       status: 'ok',
       activeGrids: 1,
