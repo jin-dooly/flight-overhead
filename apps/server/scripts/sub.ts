@@ -60,7 +60,17 @@ client.on('message', (t, payload, packet) => {
 });
 
 client.on('error', (err) => {
-  console.error(`[${time()}] 오류: ${err.message}`);
+  // 연결 거부는 AggregateError라 message가 비어 있을 수 있어 code로 판단
+  const code = (err as { code?: string }).code;
+  if (code === 'ECONNREFUSED' || !client.connected) {
+    console.error(
+      `[${time()}] ${url}에 연결할 수 없음${code ? ` (${code})` : ''}. ` +
+        '이 스크립트는 구독만 하므로, 다른 터미널에서 먼저 서버를 실행하세요: pnpm --filter @flight/server dev'
+    );
+    client.end(true, () => process.exit(1));
+    return;
+  }
+  console.error(`[${time()}] 오류: ${err.message || code || String(err)}`);
   process.exitCode = 1;
 });
 
