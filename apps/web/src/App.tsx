@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useFollowSubscription } from './hooks/useFollowSubscription';
 import { useGridSubscription } from './hooks/useGridSubscription';
 import { useMode } from './hooks/useMode';
 import { MapPage } from './pages/MapPage';
@@ -19,6 +20,8 @@ function App() {
 
   // 위치 격자를 구독함. 모드와 상관없이 App에서 부르므로 하늘 모드에서도 데이터가 계속 들어옴
   useGridSubscription();
+  // 따라가는 기체 토픽도 App에서 구독해서, 하늘 모드에 다녀와도 따라가기가 이어지게 함
+  useFollowSubscription();
 
   return (
     <main>

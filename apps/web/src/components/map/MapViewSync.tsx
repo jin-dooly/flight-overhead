@@ -11,17 +11,18 @@ import { visibleCenter } from './visibleCenter';
  * flyTo는 거리가 멀수록 오래 걸리므로(인천→부산 약 4초), 최대 2초로 맞춤.
  * 하늘 모드에서 돌아와 다시 마운트될 때는 지도가 이미 그 위치에서 시작해서 움직이지 않음.
  */
-export const LocationSync = () => {
+export const LocationSync = ({ paused = false }: { paused?: boolean }) => {
   const map = useMap();
   const lat = useLocationStore((s) => s.lat);
   const lon = useLocationStore((s) => s.lon);
   const status = useLocationStore((s) => s.status);
 
   useEffect(() => {
-    if (status === 'pending') return;
+    // 따라가는 동안에는 내 위치가 바뀌어도 지도를 옮기지 않음 (지도 중심은 비행기가 차지)
+    if (status === 'pending' || paused) return;
     const zoom = map.getZoom();
     map.flyTo(visibleCenter(map, lat, lon, zoom), zoom, { duration: 2 });
-  }, [map, lat, lon, status]);
+  }, [map, lat, lon, status, paused]);
 
   return null;
 };
