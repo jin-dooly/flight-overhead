@@ -1,5 +1,6 @@
 import type { Snapshot, SourceStatus } from '@flight/shared';
 import { create } from 'zustand';
+import { RADIUS_KM } from '../config';
 
 /**
  * 브라우저와 서버 사이의 MQTT 연결 상태 (상단 칩의 "실시간 / 재연결 중")
@@ -24,6 +25,8 @@ type FlightsState = {
   clockOffsetMs: number;
   /** 사용자가 고른 비행기. 없으면 카드에 가장 가까운 비행기를 보여 줌 */
   selectedHex: string | null;
+  /** 지도에 보여 주는 반경(km). 기본 20, 비행기가 없을 때 "반경 넓히기"로 30 */
+  radiusKm: number;
 };
 
 // 매 프레임 바뀌는 값(마커 위치)은 여기 넣지 않음. 스냅샷이 올 때만 바뀌는 값만 둠
@@ -34,4 +37,9 @@ export const useFlightsStore = create<FlightsState>(() => ({
   snapshot: null,
   clockOffsetMs: 0,
   selectedHex: null,
+  radiusKm: RADIUS_KM,
 }));
+
+/** 지금 시각을 서버 시계 기준으로. 비행기 위치 시각(seenAt)과 스냅샷 시각(fetchedAt)이 서버 시각이라 같은 기준으로 맞춤 */
+export const serverNow = () =>
+  Date.now() - useFlightsStore.getState().clockOffsetMs;

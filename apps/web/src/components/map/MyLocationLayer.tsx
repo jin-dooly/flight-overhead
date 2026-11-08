@@ -66,6 +66,7 @@ export const MyLocationLayer = ({ radiusKm }: { radiusKm: number }) => {
               icon={labelIcon(km)}
               interactive={false}
               keyboard={false}
+              zIndexOffset={-1000} // 비행기 마커와 겹치면 비행기가 위에 보이게
             />
           </Fragment>
         );

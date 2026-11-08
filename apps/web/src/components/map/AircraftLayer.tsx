@@ -6,12 +6,18 @@ import type { LatLon } from '../../lib/geo/distance';
 import {
   applyCorrection,
   CONVERGE_MS,
+  MAX_PREDICT_MS,
   predictPosition,
   startCorrection,
   type Correction,
 } from '../../lib/geo/interpolate';
-import { useFlightsStore } from '../../store/flights';
-import { createAircraftIcon, setCallsign, setRotation } from './aircraftIcon';
+import { serverNow } from '../../store/flights';
+import {
+  createAircraftIcon,
+  setCallsign,
+  setMarkerClass,
+  setRotation,
+} from './aircraftIcon';
 
 /** 마커 하나에 대해 기억하는 것 */
 type Entry = {
@@ -22,10 +28,9 @@ type Entry = {
   correction: Correction | null;
   /** 마지막으로 화면에 그린 위치. 다음 데이터가 오면 여기서부터 수렴을 시작함 */
   shown: LatLon;
+  /** 30초 넘게 새 위치를 못 받아 흐리게 보여 주는 중인지. 바뀔 때만 클래스를 바꾸려고 기억함 */
+  stale: boolean;
 };
-
-/** 지금 시각을 서버 시계 기준으로. seenAt이 서버 시각이라 같은 기준으로 맞춤 */
-const serverNow = () => Date.now() - useFlightsStore.getState().clockOffsetMs;
 
 /**
  * 비행기 마커를 Leaflet으로 직접 관리함. React 화면에는 아무것도 그리지 않음(return null).
@@ -36,19 +41,37 @@ const serverNow = () => Date.now() - useFlightsStore.getState().clockOffsetMs;
 export function AircraftLayer({
   aircraft,
   onSelect,
+  highlightHex = null,
+  outsideHex = null,
 }: {
   aircraft: Aircraft[];
   onSelect: (hex: string) => void;
+  /** 파란 원으로 강조할 비행기 (선택했거나, 카드에 보이는 가장 가까운 비행기) */
+  highlightHex?: string | null;
+  /** 반경 밖이라 흐리게 보여 줄 비행기 (반경 안에 아무도 없을 때 가장 가까운 비행기) */
+  outsideHex?: string | null;
 }) {
   const map = useMap();
   const entries = useRef(new Map<string, Entry>());
   const onSelectRef = useRef(onSelect);
+  // 새 마커를 만들 때도 강조 여부를 바로 맞추려고 최신 값을 ref에 둠
+  const classRef = useRef({ highlightHex, outsideHex });
 
   // 마커 클릭 핸들러는 마커를 만들 때 한 번만 붙이므로, 클릭 순간에 최신 onSelect를 꺼내 쓰게 함.
   // 렌더링 중에 ref를 바꾸지 않도록 effect 안에서 갱신
   useEffect(() => {
     onSelectRef.current = onSelect;
   });
+
+  // 강조, 반경 밖 표시가 바뀌면 모든 마커의 클래스를 다시 맞춤.
+  // 데이터 effect보다 먼저 선언해서, 같은 렌더링에서 새로 만든 마커에도 최신 값이 쓰이게 함
+  useEffect(() => {
+    classRef.current = { highlightHex, outsideHex };
+    for (const [hex, entry] of entries.current) {
+      setMarkerClass(entry.marker, 'is-highlighted', hex === highlightHex);
+      setMarkerClass(entry.marker, 'is-outside', hex === outsideHex);
+    }
+  }, [highlightHex, outsideHex]);
 
   // 새 데이터가 오면: 있던 마커는 새 경로로 수렴 시작, 새 비행기는 마커 생성, 사라진 비행기는 제거
   useEffect(() => {
@@ -76,11 +99,14 @@ export function AircraftLayer({
       }).addTo(map);
       marker.on('click', () => onSelectRef.current(a.hex));
       setRotation(marker, a.trackDeg);
+      setMarkerClass(marker, 'is-highlighted', a.hex === classRef.current.highlightHex);
+      setMarkerClass(marker, 'is-outside', a.hex === classRef.current.outsideHex);
       entries.current.set(a.hex, {
         marker,
         aircraft: a,
         correction: null,
         shown: predicted,
+        stale: false,
       });
     }
 
@@ -114,6 +140,12 @@ export function AircraftLayer({
           }
           entry.marker.setLatLng([pos.lat, pos.lon]);
           entry.shown = pos;
+          // 30초 넘게 새 위치가 없으면 예측도 멈추므로(MAX_PREDICT_MS) 흐리게 보여 줌 (기획서: 30초 미수신은 흐리게)
+          const stale = now - entry.aircraft.seenAt > MAX_PREDICT_MS;
+          if (stale !== entry.stale) {
+            entry.stale = stale;
+            setMarkerClass(entry.marker, 'is-stale', stale);
+          }
         }
       }
       frameId = requestAnimationFrame(frame);

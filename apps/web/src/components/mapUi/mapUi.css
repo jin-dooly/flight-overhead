@@ -1,0 +1,555 @@
+/* 지도 위에 올리는 UI (상단 칩, 안내, 하단 카드, 버튼). 값은 목업(Main, MapSelected 등)과 같음 */
+
+.map-root {
+  position: relative;
+  height: 100dvh;
+  overflow: hidden;
+}
+
+.map-root .leaflet-container {
+  position: absolute;
+  inset: 0;
+}
+
+/* 지도 위 UI 전체. 빈 곳은 지도를 끌 수 있게 클릭을 통과시키고, 실제 부품만 클릭을 받음 */
+.map-ui {
+  position: absolute;
+  inset: 0;
+  z-index: 1000; /* Leaflet 패널(z-index 400대)보다 위 */
+  pointer-events: none;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-ui > * {
+  pointer-events: none;
+}
+
+.map-ui .interactive,
+.map-ui button,
+.map-ui a,
+.map-ui [role='status'],
+.map-ui section {
+  pointer-events: auto;
+}
+
+.map-top {
+  padding: 12px 12px 0;
+  padding-top: max(12px, env(safe-area-inset-top));
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.map-bottom {
+  margin-top: auto;
+  display: flex;
+  flex-direction: column;
+}
+
+.map-bottom-row {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 0 12px 12px 8px;
+}
+
+/* ---------- 칩 ---------- */
+
+.chips {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+
+.chip {
+  height: 36px;
+  padding: 0 12px;
+  border-radius: 18px;
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: var(--shadow-chip);
+}
+
+.chip-spacer {
+  flex-grow: 1;
+}
+
+.chip .chip-sub {
+  color: var(--text-sub);
+  font-weight: 500;
+}
+
+.chip .chip-dot-sep {
+  color: var(--text-faint);
+}
+
+.chip.is-live {
+  color: var(--live-text);
+}
+
+.chip .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--live);
+  box-shadow: 0 0 0 3px rgba(18, 128, 92, 0.18);
+}
+
+.chip.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+}
+
+.chip.is-neutral {
+  color: var(--text-sub);
+}
+
+.spin {
+  animation: spin 1.2s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .spin {
+    animation: none;
+  }
+}
+
+/* ---------- 안내 띠 ---------- */
+
+.banner {
+  border-radius: 14px;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px 14px;
+  box-shadow: 0 4px 12px rgba(20, 24, 31, 0.08);
+}
+
+.banner svg {
+  flex-shrink: 0;
+}
+
+.banner-text {
+  flex-grow: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 1px;
+  min-width: 0;
+}
+
+.banner-title {
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.banner-desc {
+  font-size: 12px;
+  line-height: 1.45;
+}
+
+.banner.is-warn {
+  background: var(--warn-bg);
+  border: 1px solid var(--warn-border);
+  color: var(--warn-text-strong);
+}
+
+.banner.is-warn.has-action {
+  padding: 6px 6px 6px 14px;
+}
+
+.banner.is-dark {
+  background: var(--dark);
+  color: #ffffff;
+  padding: 12px 14px;
+  box-shadow: 0 6px 16px rgba(20, 24, 31, 0.24);
+}
+
+.banner.is-dark .banner-desc {
+  color: #c9ced6;
+}
+
+.banner.is-neutral {
+  background: var(--card);
+  color: var(--text);
+  box-shadow: var(--shadow-chip);
+}
+
+.banner.is-neutral .banner-desc {
+  color: var(--text-sub);
+}
+
+.banner-action {
+  height: 44px;
+  padding: 0 14px;
+  border: none;
+  border-radius: 10px;
+  background: var(--card);
+  color: var(--warn-text-strong);
+  font-size: 13px;
+  font-weight: 600;
+  flex-shrink: 0;
+}
+
+/* ---------- 버튼 ---------- */
+
+.round-button {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  border: none;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 1px 2px rgba(20, 24, 31, 0.12), 0 4px 12px rgba(20, 24, 31, 0.1);
+}
+
+.map-controls {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  align-items: center;
+}
+
+.zoom-buttons {
+  display: none; /* 폰은 두 손가락으로 확대, 데스크톱에서만 보여 줌 */
+  flex-direction: column;
+  border-radius: 14px;
+  background: var(--card);
+  overflow: hidden;
+  box-shadow: 0 1px 2px rgba(20, 24, 31, 0.12), 0 4px 12px rgba(20, 24, 31, 0.1);
+}
+
+.zoom-buttons button {
+  width: 48px;
+  height: 48px;
+  border: none;
+  background: var(--card);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.zoom-buttons button:disabled svg {
+  opacity: 0.3;
+}
+
+.zoom-buttons hr {
+  margin: 0;
+  border: none;
+  height: 1px;
+  background: var(--line);
+}
+
+.attribution {
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.88);
+  font-size: 10px;
+  color: var(--text-sub);
+  pointer-events: auto;
+}
+
+.attribution a {
+  color: inherit;
+}
+
+.button {
+  height: 52px;
+  border-radius: 14px;
+  border: none;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  font-size: 15px;
+  font-weight: 600;
+  text-decoration: none;
+  flex: 1 1 0;
+}
+
+.button.is-primary {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+.button.is-dark {
+  background: var(--dark);
+  color: #ffffff;
+}
+
+.button.is-secondary {
+  background: var(--cell);
+  color: var(--text);
+}
+
+.button:disabled,
+.button[aria-disabled='true'] {
+  background: var(--disabled);
+  color: var(--text-sub);
+}
+
+/* ---------- 하단 카드 ---------- */
+
+.sheet {
+  background: var(--card);
+  border-radius: 20px 20px 0 0;
+  box-shadow: var(--shadow-sheet);
+  padding: 10px 20px 20px;
+  padding-bottom: max(20px, env(safe-area-inset-bottom));
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.sheet-handle {
+  align-self: center;
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--handle);
+}
+
+.sheet-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  min-height: 20px;
+}
+
+.sheet-kind {
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+}
+
+.sheet-kind.is-selected {
+  color: var(--accent);
+}
+
+.sheet-ago {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 500;
+  color: var(--text-muted);
+}
+
+.sheet-ago.is-warn {
+  font-weight: 600;
+  color: var(--warn-text);
+}
+
+.sheet-close {
+  width: 44px;
+  height: 44px;
+  margin: -12px -12px -12px 0;
+  border: none;
+  background: none;
+  border-radius: 22px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.sheet-main {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+.sheet-id,
+.sheet-distance {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.sheet-distance {
+  align-items: flex-end;
+  flex-shrink: 0;
+}
+
+.callsign {
+  font-family: var(--font-mono);
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: -0.01em;
+  line-height: 1.1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.distance {
+  font-size: 28px;
+  font-weight: 700;
+  line-height: 1.1;
+  color: var(--accent);
+}
+
+.distance small {
+  font-size: 15px;
+  font-weight: 600;
+  margin-left: 2px;
+}
+
+.caption {
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+.stats {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 8px;
+}
+
+.stat {
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: var(--cell);
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stat-label {
+  font-size: 12px;
+  color: var(--text-sub);
+}
+
+.stat-value {
+  font-size: 17px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  white-space: nowrap;
+}
+
+.stat-sub {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+.sheet-actions {
+  display: flex;
+  gap: 8px;
+}
+
+/* 서버와 연결이 끊긴 동안: 마지막으로 받은 값을 회색으로 */
+.sheet.is-dim .callsign,
+.sheet.is-dim .distance,
+.sheet.is-dim .stat-value {
+  color: var(--text-sub);
+}
+
+/* 비행기가 없을 때, 연결 중일 때 */
+.sheet-empty {
+  display: flex;
+  gap: 14px;
+  align-items: flex-start;
+}
+
+.sheet-empty-icon {
+  width: 48px;
+  height: 48px;
+  border-radius: 14px;
+  background: var(--cell);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.sheet-empty h2 {
+  margin: 0;
+  font-size: 19px;
+  font-weight: 700;
+  line-height: 1.35;
+}
+
+.sheet-empty p {
+  margin: 4px 0 0;
+  font-size: 14px;
+  line-height: 1.5;
+  color: var(--text-sub);
+}
+
+.sheet-empty strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.sheet-note {
+  margin: 0;
+  text-align: center;
+  font-size: 12px;
+  color: var(--text-muted);
+}
+
+/* ---------- 데스크톱: 왼쪽 위 패널 (목업 MapDesktop) ---------- */
+
+@media (min-width: 768px) {
+  .map-top {
+    position: absolute;
+    left: 24px;
+    top: 24px;
+    width: 380px;
+    padding: 0;
+    gap: 12px;
+  }
+
+  .map-bottom-row {
+    position: absolute;
+    right: 24px;
+    bottom: 32px;
+    padding: 0;
+    flex-direction: row-reverse;
+    align-items: flex-end;
+    gap: 16px;
+  }
+
+  .zoom-buttons {
+    display: flex;
+  }
+
+  .attribution {
+    font-size: 11px;
+  }
+
+  .sheet {
+    border-radius: 20px;
+    box-shadow: var(--shadow-panel);
+    padding: 20px;
+  }
+
+  .sheet-handle {
+    display: none;
+  }
+
+  .button {
+    height: 48px;
+  }
+}
