@@ -1,11 +1,14 @@
 import {
+  parseFollowTopic,
   STATUS_TOPIC,
+  type FollowSnapshot,
   type Snapshot,
   type SourceStatus,
 } from '@flight/shared';
 import mqtt, { type MqttClient } from 'mqtt';
 import { MQTT_URL } from '../config';
 import { useFlightsStore } from '../store/flights';
+import { applyFollowSnapshot } from '../store/follow';
 
 const SOURCE_STATUSES: readonly SourceStatus[] = ['ok', 'fallback', 'degraded'];
 
@@ -45,6 +48,12 @@ export const getMqttClient = (): MqttClient => {
       return;
     }
 
+    if (parseFollowTopic(topic)) {
+      const follow = parseFollowSnapshot(payload.toString());
+      if (follow) applyFollowSnapshot(follow);
+      return;
+    }
+
     // 격자를 바꾼 직후 이전 격자에서 늦게 도착한 메시지는 버림
     if (topic !== useFlightsStore.getState().topic) return;
 
@@ -68,6 +77,17 @@ const parseSnapshot = (text: string): Snapshot | null => {
       return null;
     }
     return data as Snapshot;
+  } catch {
+    return null;
+  }
+};
+
+const parseFollowSnapshot = (text: string): FollowSnapshot | null => {
+  try {
+    const data = JSON.parse(text) as Partial<FollowSnapshot>;
+    if (typeof data.hex !== 'string' || data.aircraft === undefined) return null;
+    if (data.aircraft !== null && typeof data.aircraft?.lat !== 'number') return null;
+    return data as FollowSnapshot;
   } catch {
     return null;
   }
