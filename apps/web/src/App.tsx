@@ -1,4 +1,5 @@
 import { useEffect } from 'react';
+import { useGridSubscription } from './hooks/useGridSubscription';
 import { useMode } from './hooks/useMode';
 import { MapPage } from './pages/MapPage';
 import { SkyPage } from './pages/SkyPage';
@@ -6,7 +7,7 @@ import { useLocationStore } from './store/location';
 
 // App은 어떤 모드를 보여 줄지만 정함. 지도는 MapPage 안에만 있어서
 // 하늘 모드에서는 지도가 아예 그려지지 않음.
-// 두 모드가 같이 쓰는 위치(그리고 나중에 MQTT 연결)는 스토어에 둠.
+// 두 모드가 같이 쓰는 위치와 MQTT 데이터는 스토어에 둠.
 function App() {
   const [mode, setMode] = useMode();
   const requestLocation = useLocationStore((s) => s.requestLocation);
@@ -15,6 +16,9 @@ function App() {
   useEffect(() => {
     requestLocation();
   }, [requestLocation]);
+
+  // 위치 격자를 구독함. 모드와 상관없이 App에서 부르므로 하늘 모드에서도 데이터가 계속 들어옴
+  useGridSubscription();
 
   return (
     <main>
