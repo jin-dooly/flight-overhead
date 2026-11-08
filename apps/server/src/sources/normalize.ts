@@ -1,4 +1,4 @@
-import type { Aircraft } from '@flight/shared';
+import type { Aircraft, FollowedAircraft } from '@flight/shared';
 
 const num = (value: unknown): number | undefined =>
   typeof value === 'number' && Number.isFinite(value) ? value : undefined;
@@ -55,4 +55,41 @@ export const normalizeResponse = (
   return list
     .map((raw) => normalizeAircraft(raw, now))
     .filter((a): a is Aircraft => a !== null);
+};
+
+/**
+ * 따라가기용 정규화. 격자와 달리 지상 기체를 버리지 않고 `onGround: true`로 표시함
+ * (기획서 따라가기 설계: 지상 여부를 함께 보내서 "착륙했어요"를 보여 줌)
+ */
+export const normalizeFollowed = (
+  raw: unknown,
+  now: number
+): FollowedAircraft | null => {
+  if (typeof raw !== 'object' || raw === null) return null;
+  const item = raw as Record<string, unknown>;
+  const onGround = item.alt_baro === 'ground';
+  // 지상이면 고도 값이 "ground" 문자열이라, 그 필드만 빼고 공통 정규화를 씀
+  const aircraft = normalizeAircraft(onGround ? { ...item, alt_baro: undefined } : item, now);
+  return aircraft ? { ...aircraft, onGround } : null;
+};
+
+/**
+ * 기체 ID 조회 응답에서 그 기체를 꺼냄. 응답에 없으면(수신 범위 밖) null.
+ * 목록 키는 소스와 API마다 달라서(adsb.fi는 좌표 조회는 `aircraft`, 기체 ID 조회는 `ac`) 둘 다 봄.
+ * 목록 자체가 없으면 형식 오류로 보고 throw (예비 전환 조건)
+ */
+export const normalizeHexResponse = (
+  body: unknown,
+  hex: string,
+  now: number
+): FollowedAircraft | null => {
+  const record =
+    typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
+  const list = [record.ac, record.aircraft].find(Array.isArray);
+  if (!list) throw new Error('응답에 "ac"나 "aircraft" 배열이 없음');
+  for (const raw of list) {
+    const followed = normalizeFollowed(raw, now);
+    if (followed && followed.hex.toLowerCase() === hex) return followed;
+  }
+  return null;
 };

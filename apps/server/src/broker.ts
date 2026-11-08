@@ -1,6 +1,6 @@
 import type { IncomingMessage, Server } from 'node:http';
 import type { Duplex } from 'node:stream';
-import { parseSnapshotTopic, STATUS_TOPIC } from '@flight/shared';
+import { parseFollowTopic, parseSnapshotTopic, STATUS_TOPIC } from '@flight/shared';
 import { Aedes, type AedesOptions, type Client } from 'aedes';
 import { createWebSocketStream, WebSocketServer } from 'ws';
 
@@ -8,7 +8,9 @@ export const MQTT_PATH = '/mqtt';
 
 /** 브라우저가 구독해도 되는 토픽인지. 와일드카드(+, #)는 파싱에 실패하므로 여기서 걸러짐 */
 export const isSubscribableTopic = (topic: string): boolean =>
-  topic === STATUS_TOPIC || parseSnapshotTopic(topic) !== null;
+  topic === STATUS_TOPIC ||
+  parseSnapshotTopic(topic) !== null ||
+  parseFollowTopic(topic) !== null;
 
 /**
  * 클라이언트의 발행은 Will 메시지까지 포함해 전부 거절.
@@ -33,10 +35,24 @@ export const authorizeSubscribe: NonNullable<
   callback(null, isSubscribableTopic(subscription.topic) ? subscription : null);
 };
 
-export const createBroker = (): Promise<Aedes> =>
+export type BrokerOptions = {
+  /**
+   * 형식 검사를 통과한 구독을 한 번 더 막을지 정함 (예: 서버 전체 동시 따라가기 수 상한).
+   * false면 형식이 틀린 구독과 똑같이 SUBACK 128로 거절함
+   */
+  allowSubscribe?: (topic: string) => boolean;
+};
+
+export const createBroker = ({ allowSubscribe }: BrokerOptions = {}): Promise<Aedes> =>
   Aedes.createBroker({
     authorizePublish,
-    authorizeSubscribe,
+    authorizeSubscribe: (client, subscription, callback) =>
+      authorizeSubscribe(client, subscription, (err, sub) =>
+        callback(
+          err,
+          sub && (allowSubscribe?.(sub.topic) ?? true) ? sub : null
+        )
+      ),
     // 응답 없는 클라이언트 하나가 전체 전송을 막지 않도록 문서 권장 범위(10~60초)의 값을 씀
     drainTimeout: 30_000,
   });

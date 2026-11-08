@@ -27,3 +27,17 @@ export type Snapshot = {
 
 /** `status/source` 토픽 값. ok = 메인 소스, fallback = 예비 소스, degraded = 둘 다 실패 */
 export type SourceStatus = 'ok' | 'fallback' | 'degraded';
+
+/** 따라가기 토픽의 기체. 격자와 달리 지상 기체도 버리지 않고 "착륙했어요"를 보여 주려고 지상 여부를 같이 보냄 */
+export type FollowedAircraft = Aircraft & {
+  onGround: boolean;
+};
+
+/** `aircraft/{hex}` 토픽에 retained로 발행되는 따라가기 스냅샷 */
+export type FollowSnapshot = {
+  hex: string;
+  /** 응답에 그 기체가 없으면(수신 범위 밖, 신호 끊김) null */
+  aircraft: FollowedAircraft | null;
+  source: SourceName;
+  fetchedAt: number;
+};
