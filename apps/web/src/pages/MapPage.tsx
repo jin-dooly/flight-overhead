@@ -3,7 +3,10 @@ import '../components/mapUi/mapUi.css';
 import type { Map as LeafletMap } from 'leaflet';
 import { useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
+import { FollowButton } from '../components/follow/FollowButton';
+import { FollowOverlay } from '../components/follow/FollowOverlay';
 import { AircraftLayer } from '../components/map/AircraftLayer';
+import { FollowMapMode, FollowTrail } from '../components/map/FollowMapMode';
 import { LocationSync, ZoomLimit } from '../components/map/MapViewSync';
 import { MyLocationLayer } from '../components/map/MyLocationLayer';
 import { AircraftSheet } from '../components/mapUi/AircraftSheet';
@@ -14,19 +17,25 @@ import { MAX_VIEW_RADIUS_KM } from '../config';
 import { useDataStatus, useNearby } from '../hooks/useMapData';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { boundsAround } from '../lib/geo/distance';
+import { visibleCenter } from '../components/map/visibleCenter';
 import { useFlightsStore } from '../store/flights';
+import { stopFollow, useFollowStore } from '../store/follow';
 import { useLocationStore } from '../store/location';
 
 const MAP_ZOOM = 10; // 폰 세로 화면에서 반경 20km 원이 화면 너비에 맞는 정도 (목업 Main)
 
 const selectAircraft = (hex: string) => useFlightsStore.setState({ selectedHex: hex });
+const noop = () => {};
+
+// 카드 버튼 줄의 "따라가기" 버튼
+const followAction = (hex: string) => <FollowButton hex={hex} />;
 
 export const MapPage = ({
   onOpenSky,
-  sheetActions,
+  sheetActions = followAction,
 }: {
   onOpenSky: () => void;
-  /** 카드 버튼 줄에 붙일 추가 버튼 (따라가기) */
+  /** 카드 버튼 줄에 붙일 추가 버튼 */
   sheetActions?: (hex: string) => ReactNode;
 }) => {
   // MapContainer의 center는 처음 한 번만 쓰임. 이후 이동은 LocationSync가 맡음
@@ -35,6 +44,19 @@ export const MapPage = ({
   const connection = useFlightsStore((s) => s.connection);
   const nearby = useNearby();
   const isDesktop = useMediaQuery('(min-width: 768px)');
+  const followHex = useFollowStore((s) => s.hex);
+  const followLast = useFollowStore((s) => s.last);
+  const following = followHex !== null;
+  const followed = useMemo(() => (followLast ? [followLast] : []), [followLast]);
+
+  // 따라가기를 끝내면 지도를 원래 줌으로 내 위치에 되돌림
+  const onExitFollow = () => {
+    stopFollow();
+    const map = mapRef.current;
+    if (!map) return;
+    const { lat, lon } = useLocationStore.getState();
+    map.flyTo(visibleCenter(map, lat, lon, MAP_ZOOM), MAP_ZOOM, { duration: 1.5 });
+  };
 
   // 고른 비행기가 반경 밖으로 나가거나 사라지면 선택을 풀어서, 다시 들어와도 갑자기 선택되지 않게 함
   const selectedHex = useFlightsStore((s) => s.selectedHex);
@@ -72,7 +94,9 @@ export const MapPage = ({
   );
 
   return (
-    <div className={`map-root${connection === 'reconnecting' ? ' is-offline' : ''}`}>
+    <div
+      className={`map-root${connection === 'reconnecting' ? ' is-offline' : ''}${following ? ' is-following' : ''}`}
+    >
       <MapContainer
         ref={mapRef}
         center={[initialCenter.lat, initialCenter.lon]}
@@ -81,32 +105,53 @@ export const MapPage = ({
         attributionControl={false} // 출처는 카드에 가리지 않는 자리에 직접 표시 (Attribution)
       >
         <TileLayer url="https://tile.openstreetmap.org/{z}/{x}/{y}.png" />
-        <LocationSync />
-        <ZoomLimit />
+        <LocationSync paused={following} />
         <MyLocationLayer radiusKm={nearby.radiusKm} />
-        <AircraftLayer
-          aircraft={shown}
-          onSelect={selectAircraft}
-          highlightHex={nearby.card?.target.item.hex ?? null}
-          outsideHex={outsideHex}
-        />
+        {following ? (
+          // 따라가는 동안에는 그 비행기 하나만 그리고, 매 프레임 지도 중심을 그 비행기에 맞춤
+          <>
+            <FollowMapMode />
+            <FollowTrail />
+            <AircraftLayer
+              aircraft={followed}
+              onSelect={noop}
+              highlightHex={followHex}
+              followHex={followHex}
+            />
+          </>
+        ) : (
+          <>
+            <ZoomLimit />
+            <AircraftLayer
+              aircraft={shown}
+              onSelect={selectAircraft}
+              highlightHex={nearby.card?.target.item.hex ?? null}
+              outsideHex={outsideHex}
+            />
+          </>
+        )}
       </MapContainer>
 
       {/* 지도 위 UI는 MapContainer 밖에 둠. 안에 두면 버튼 클릭이 지도 끌기, 더블클릭 확대로 새어 나감 */}
       <div className="map-ui">
         <div className="map-top">
-          <TopAndBanner
-            count={nearby.hasSnapshot ? nearby.inside.length : null}
-            radiusKm={nearby.radiusKm}
-          />
-          {isDesktop && sheet}
+          {following ? (
+            <FollowOverlay placement="top" onExit={onExitFollow} />
+          ) : (
+            <TopAndBanner
+              count={nearby.hasSnapshot ? nearby.inside.length : null}
+              radiusKm={nearby.radiusKm}
+            />
+          )}
+          {isDesktop && (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
         </div>
         <div className="map-bottom">
           <div className="map-bottom-row">
             <Attribution />
             <MapControls mapRef={mapRef} zoom={MAP_ZOOM} />
           </div>
-          {!isDesktop && sheet}
+          {!isDesktop &&
+            (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
         </div>
       </div>
     </div>

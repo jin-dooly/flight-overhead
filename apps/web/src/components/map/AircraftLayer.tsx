@@ -18,6 +18,7 @@ import {
   setMarkerClass,
   setRotation,
 } from './aircraftIcon';
+import { visibleCenter } from './visibleCenter';
 
 /** 마커 하나에 대해 기억하는 것 */
 type Entry = {
@@ -43,6 +44,7 @@ export function AircraftLayer({
   onSelect,
   highlightHex = null,
   outsideHex = null,
+  followHex = null,
 }: {
   aircraft: Aircraft[];
   onSelect: (hex: string) => void;
@@ -50,12 +52,18 @@ export function AircraftLayer({
   highlightHex?: string | null;
   /** 반경 밖이라 흐리게 보여 줄 비행기 (반경 안에 아무도 없을 때 가장 가까운 비행기) */
   outsideHex?: string | null;
+  /** 따라가는 비행기. 매 프레임 지도 중심을 이 비행기의 예상 위치로 옮김 */
+  followHex?: string | null;
 }) {
   const map = useMap();
   const entries = useRef(new Map<string, Entry>());
   const onSelectRef = useRef(onSelect);
   // 새 마커를 만들 때도 강조 여부를 바로 맞추려고 최신 값을 ref에 둠
   const classRef = useRef({ highlightHex, outsideHex });
+  const followRef = useRef(followHex);
+  useEffect(() => {
+    followRef.current = followHex;
+  }, [followHex]);
 
   // 마커 클릭 핸들러는 마커를 만들 때 한 번만 붙이므로, 클릭 순간에 최신 onSelect를 꺼내 쓰게 함.
   // 렌더링 중에 ref를 바꾸지 않도록 effect 안에서 갱신
@@ -140,6 +148,12 @@ export function AircraftLayer({
           }
           entry.marker.setLatLng([pos.lat, pos.lon]);
           entry.shown = pos;
+          // 따라가기: 마커를 옮긴 같은 프레임에 지도도 옮겨서, 비행기가 화면 가운데에 고정돼 보이게 함.
+          // 애니메이션 없이 바로 옮겨야 매 프레임 이동이 서로 겹치지 않음
+          if (entry.aircraft.hex === followRef.current) {
+            const zoom = map.getZoom();
+            map.setView(visibleCenter(map, pos.lat, pos.lon, zoom), zoom, { animate: false });
+          }
           // 30초 넘게 새 위치가 없으면 예측도 멈추므로(MAX_PREDICT_MS) 흐리게 보여 줌 (기획서: 30초 미수신은 흐리게)
           const stale = now - entry.aircraft.seenAt > MAX_PREDICT_MS;
           if (stale !== entry.stale) {
