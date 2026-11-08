@@ -101,6 +101,11 @@ apps/server/scripts/sub.ts
 - `App.tsx`에서 `toGrid`, `snapshotTopic`, `Snapshot` 타입을 import해 타입 체크와 Vite 로드를 확인 (일부러 틀린 값을 넣었을 때 타입 오류가 나는 것도 확인).
 - 의존성 `react-leaflet`, `leaflet`, `zustand`, `mqtt`와 `@types/leaflet` 설치.
 
+**배포 준비** (2026-11-08)
+
+- 서버 `start`가 `tsx`로 실행하므로 `tsx`를 devDependencies에서 dependencies로 옮김 (Render에서 운영용 설치를 해도 서버가 뜨게).
+- 프론트 MQTT 주소는 `VITE_MQTT_URL`(`apps/web/src/config.ts`의 `MQTT_URL`). 비워 두면 `ws://localhost:4000/mqtt`, 배포에서는 Vercel 환경 변수에 `wss://<서버>/mqtt`.
+
 ## 4. 확인 필요 (판단이 필요한 것)
 
 1. **실제 비행기가 있는 응답으로 정규화 확인.** 새벽이라 0대였습니다. 낮에 서버를 띄우고 `pnpm --filter @flight/server sub`를 한 번 실행해서 비행기 수와 편명이 나오는지 봐 주세요. 필드 이름이 다르면 `apps/server/src/sources/normalize.ts`만 고치면 됩니다.
@@ -189,7 +194,7 @@ pnpm --filter @flight/web dev
 
 **데이터 관련**
 
-- 서버는 반경 15해리(약 28km)로 조회하므로, 20km 필터와 가장 가까운 비행기 계산은 클라이언트에서 해야 합니다 (기획서 "클라이언트 처리").
+- 서버는 반경 17해리(약 31km)로 조회하므로, 20km 필터와 가장 가까운 비행기 계산은 클라이언트에서 해야 합니다 (기획서 "클라이언트 처리").
 - 지상 기체는 서버에서 이미 빠져 있습니다. `altFt`, `speedKt`, `trackDeg`, `callsign`은 없을 수 있습니다.
 - `seenAt`은 위치를 받은 시각, `fetchedAt`은 서버가 조회한 시각(ms)입니다. "데이터 N초 전" 표시는 `fetchedAt` 기준이 맞습니다.
 - 메시지 payload는 `Uint8Array`이므로 `JSON.parse(new TextDecoder().decode(payload))`로 읽으면 됩니다.
