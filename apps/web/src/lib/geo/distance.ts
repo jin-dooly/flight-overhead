@@ -21,6 +21,22 @@ export const distanceKm = (a: LatLon, b: LatLon): number => {
 };
 
 /**
+ * 기준점에서 반경 km 원을 감싸는 사각형 [[남, 서], [북, 동]].
+ * 지도의 최소 줌("반경 30km가 보일 때까지만 축소")을 계산할 때 씀
+ */
+export const boundsAround = (
+  center: LatLon,
+  km: number
+): [[number, number], [number, number]] => {
+  const dLat = (km / (2 * Math.PI * EARTH_RADIUS_KM)) * 360;
+  const dLon = dLat / Math.cos(toRad(center.lat));
+  return [
+    [center.lat - dLat, center.lon - dLon],
+    [center.lat + dLat, center.lon + dLon],
+  ];
+};
+
+/**
  * 기준점에서 가까운 순으로 정렬하고 거리를 같이 붙여 돌려줌. 원래 배열은 바꾸지 않음.
  * 반경 안 비행기(앞에서부터 radius 이하), 가장 가까운 비행기(첫 번째),
  * "반경 안에 없음" 화면의 가장 가까운 거리까지 한 번의 계산으로 모두 얻으려고 정렬까지 함

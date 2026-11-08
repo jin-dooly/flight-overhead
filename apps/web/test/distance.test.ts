@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { distanceKm, sortByDistance } from '../src/lib/geo/distance';
+import { boundsAround, distanceKm, sortByDistance } from '../src/lib/geo/distance';
 
 // 지구 반지름 6371km 기준 위도 1도의 길이 (2πR / 360)
 const ONE_DEGREE_KM = (2 * Math.PI * 6371) / 360; // 약 111.19km
@@ -44,6 +44,18 @@ describe('distanceKm', () => {
     // 경도 179.9와 -179.9는 0.2도 차이 (359.8도가 아님)
     const d = distanceKm({ lat: 0, lon: 179.9 }, { lat: 0, lon: -179.9 });
     expect(d).toBeCloseTo(ONE_DEGREE_KM * 0.2, 6);
+  });
+});
+
+describe('boundsAround', () => {
+  it('사각형의 각 변 가운데까지 거리가 반경과 같음', () => {
+    const center = { lat: 37.5, lon: 127 };
+    const [[s, w], [n, e]] = boundsAround(center, 30);
+    expect(distanceKm(center, { lat: n, lon: 127 })).toBeCloseTo(30, 6);
+    expect(distanceKm(center, { lat: s, lon: 127 })).toBeCloseTo(30, 6);
+    // 경도 방향은 평면 근사라 아주 조금 다름 (30km에서 1m 미만)
+    expect(distanceKm(center, { lat: 37.5, lon: e })).toBeCloseTo(30, 2);
+    expect(distanceKm(center, { lat: 37.5, lon: w })).toBeCloseTo(30, 2);
   });
 });
 

@@ -1,13 +1,206 @@
+/*
+ * 디자인 토큰. 목업의 스타일 가이드(Tokens)와 같은 값.
+ * 지도 모드는 밝은 화면, 하늘 모드는 어두운 화면이라 시스템 다크 모드를 따르지 않음
+ */
 :root {
-  font-family: system-ui, -apple-system, 'Apple SD Gothic Neo', 'Malgun Gothic',
-    sans-serif;
-  color-scheme: light dark;
+  --text: #14181f;
+  --text-sub: #4a5260;
+  --text-muted: #5b6270;
+  --text-faint: #9aa1ac;
+  --accent: #1a54e6;
+  --accent-soft: rgba(26, 84, 230, 0.12);
+  --live: #12805c;
+  --live-text: #0e6b4d;
+  --warn-text: #8a5300;
+  --warn-text-strong: #6b4100;
+  --warn-bg: #fff6e5;
+  --warn-border: #f0d29a;
+  --card: #ffffff;
+  --cell: #f3f5f8;
+  --line: #e2e6ec;
+  --handle: #d5d9de;
+  --disabled: #e2e6ec;
+  --ground: #eceee8;
+  --dark: #14181f;
+  --sky-bg: #0b1428;
+  --sky-card: #13213f;
+  --sky-accent: #9db8ff;
+
+  --shadow-chip: 0 1px 2px rgba(20, 24, 31, 0.12), 0 4px 12px rgba(20, 24, 31, 0.08);
+  --shadow-sheet: 0 -4px 20px rgba(20, 24, 31, 0.1);
+  --shadow-panel: 0 1px 2px rgba(20, 24, 31, 0.1), 0 8px 24px rgba(20, 24, 31, 0.1);
+
+  --font: 'IBM Plex Sans KR', system-ui, -apple-system, 'Apple SD Gothic Neo',
+    'Malgun Gothic', sans-serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, 'SFMono-Regular', Menlo, monospace;
+
+  font-family: var(--font);
+  color: var(--text);
+  color-scheme: light;
+  -webkit-text-size-adjust: 100%;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#root {
+  height: 100%;
 }
 
 body {
   margin: 0;
+  background: var(--ground);
+  overflow: hidden; /* 지도 화면이 전체를 차지하므로 페이지 스크롤 없음 */
 }
 
-main {
-  padding: 16px;
+button {
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
+}
+
+button:disabled {
+  cursor: default;
+}
+
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
+}
+
+.mono {
+  font-family: var(--font-mono);
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+
+/* ---------- 비행기 마커 (components/map/aircraftIcon.ts) ---------- */
+
+/* Leaflet 기본 divIcon의 흰 상자를 없앰 */
+.aircraft-marker {
+  background: none;
+  border: none;
+}
+
+.aircraft-marker .aircraft-ring {
+  position: absolute;
+  left: -6px;
+  top: -6px;
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 2px solid var(--accent);
+  background: var(--accent-soft);
+  display: none;
+}
+
+.aircraft-marker .aircraft-rotor {
+  width: 28px;
+  height: 28px;
+  color: var(--text);
+  /* 회전에는 transition을 넣지 않음. 359도 → 1도처럼 바뀌면 반대로 한 바퀴 도는 것처럼 보임 */
+}
+
+.aircraft-marker .aircraft-rotor svg {
+  display: block;
+}
+
+.aircraft-marker .aircraft-label {
+  position: absolute;
+  left: 30px;
+  top: 4px;
+  padding: 2px 6px;
+  border-radius: 6px;
+  background: var(--card);
+  color: var(--text);
+  font-family: var(--font-mono);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.4;
+  white-space: nowrap;
+  box-shadow: 0 1px 2px rgba(20, 24, 31, 0.18);
+  pointer-events: none;
+}
+
+.aircraft-marker .aircraft-label:empty {
+  display: none;
+}
+
+/* 선택했거나, 선택 전이라 카드에 보이는 가장 가까운 비행기 */
+.aircraft-marker.is-highlighted {
+  z-index: 1000 !important;
+}
+
+.aircraft-marker.is-highlighted .aircraft-ring {
+  display: block;
+}
+
+.aircraft-marker.is-highlighted .aircraft-rotor {
+  color: var(--accent);
+}
+
+.aircraft-marker.is-highlighted .aircraft-label {
+  background: var(--accent);
+  color: #ffffff;
+}
+
+/* 30초 넘게 새 위치를 못 받은 비행기, 반경 밖의 가장 가까운 비행기, 서버 연결이 끊긴 동안 */
+.aircraft-marker.is-stale,
+.aircraft-marker.is-outside,
+.map-root.is-offline .aircraft-marker {
+  opacity: 0.45;
+}
+
+.aircraft-marker.is-stale .aircraft-rotor,
+.aircraft-marker.is-outside .aircraft-rotor,
+.map-root.is-offline .aircraft-marker .aircraft-rotor {
+  color: var(--text-sub);
+}
+
+.aircraft-marker.is-outside .aircraft-label {
+  color: var(--text-sub);
+}
+
+/* ---------- 내 위치 점 ---------- */
+
+.my-location-dot {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: var(--accent);
+  border: 3px solid #ffffff;
+  box-shadow: 0 0 0 6px rgba(26, 84, 230, 0.18);
+}
+
+.radius-label {
+  background: none;
+  border: none;
+}
+
+.radius-label span {
+  display: inline-block;
+  transform: translate(-50%, -50%);
+  padding: 1px 6px;
+  border-radius: 6px;
+  background: var(--card);
+  font-family: var(--font-mono);
+  font-size: 10px;
+  font-weight: 600;
+  color: var(--accent);
+  white-space: nowrap;
+}
+
+.leaflet-container {
+  font-family: var(--font);
+  background: var(--ground);
 }

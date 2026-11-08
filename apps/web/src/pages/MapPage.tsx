@@ -1,14 +1,10 @@
 import 'leaflet/dist/leaflet.css';
 import type { Map as LeafletMap } from 'leaflet';
-import { useEffect, useMemo, useRef, type RefObject } from 'react';
-import {
-  Circle,
-  CircleMarker,
-  MapContainer,
-  TileLayer,
-  useMap,
-} from 'react-leaflet';
+import { useMemo, useRef, type RefObject } from 'react';
+import { MapContainer, TileLayer } from 'react-leaflet';
 import { AircraftLayer } from '../components/map/AircraftLayer';
+import { LocationSync, ZoomLimit } from '../components/map/MapViewSync';
+import { MyLocationLayer } from '../components/map/MyLocationLayer';
 import { DEFAULT_LOCATION, RADIUS_KM } from '../config';
 import { sortByDistance } from '../lib/geo/distance';
 import { useFlightsStore } from '../store/flights';
@@ -36,7 +32,8 @@ export const MapPage = ({ onOpenSky }: { onOpenSky: () => void }) => {
           attribution="&copy; OpenStreetMap contributors · 데이터 adsb.lol / adsb.fi"
         />
         <LocationSync />
-        <MyLocationLayer />
+        <ZoomLimit />
+        <MyLocationLayer radiusKm={RADIUS_KM} />
         <NearbyAircraftLayer />
       </MapContainer>
 
@@ -131,26 +128,6 @@ const NearbyAircraftLayer = () => {
   return <AircraftLayer aircraft={nearby} onSelect={selectAircraft} />;
 };
 
-/**
- * 스토어의 위치가 바뀌면 지도를 날아가듯 옮김. 처음 내 위치를 얻었을 때도 인천공항에서
- * 내 위치로 이동하는 모습을 보여 줌.
- * flyTo는 거리가 멀수록 오래 걸리므로(인천→부산 약 4초), 최대 2초로 맞춤.
- * 하늘 모드에서 돌아와 다시 마운트될 때는 지도가 이미 그 위치에서 시작해서 움직이지 않음.
- */
-const LocationSync = () => {
-  const map = useMap();
-  const lat = useLocationStore((s) => s.lat);
-  const lon = useLocationStore((s) => s.lon);
-  const status = useLocationStore((s) => s.status);
-
-  useEffect(() => {
-    if (status === 'pending') return;
-    map.flyTo([lat, lon], map.getZoom(), { duration: 2 });
-  }, [map, lat, lon, status]);
-
-  return null;
-};
-
 /** 내 위치가 있으면 지도를 그리로 옮기고, 없으면 권한을 다시 요청함 */
 const LocateButton = ({
   mapRef,
@@ -180,39 +157,5 @@ const LocateButton = ({
     >
       ◎
     </button>
-  );
-};
-
-// 위치를 기다리는 동안에는 반경 원과 내 위치 점을 숨김(기본 위치를 내 위치처럼 보이지 않게).
-// 기본 위치일 때는 반경 원만 보여 주고, 내 위치 점은 숨김
-const MyLocationLayer = () => {
-  const status = useLocationStore((s) => s.status);
-  const lat = useLocationStore((s) => s.lat);
-  const lon = useLocationStore((s) => s.lon);
-  if (status === 'pending') return null;
-  const center: [number, number] = [lat, lon];
-
-  return (
-    <>
-      <Circle
-        center={center}
-        radius={RADIUS_KM * 1000}
-        interactive={false}
-        pathOptions={{ weight: 1, fillOpacity: 0.03 }}
-      />
-      <Circle
-        center={center}
-        radius={(RADIUS_KM / 2) * 1000}
-        interactive={false}
-        pathOptions={{ weight: 1, fillOpacity: 0.05 }}
-      />
-      {status === 'granted' && (
-        <CircleMarker
-          center={center}
-          radius={6}
-          pathOptions={{ fillOpacity: 1 }}
-        />
-      )}
-    </>
   );
 };
