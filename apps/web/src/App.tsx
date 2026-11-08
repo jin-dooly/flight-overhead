@@ -1,7 +1,7 @@
 import { useEffect } from 'react';
 import { useFollowSubscription } from './hooks/useFollowSubscription';
 import { useGridSubscription } from './hooks/useGridSubscription';
-import { useMode } from './hooks/useMode';
+import { goBackOr, useMode } from './hooks/useMode';
 import { MapPage } from './pages/MapPage';
 import { SkyPage } from './pages/SkyPage';
 import { useLocationStore } from './store/location';
@@ -26,7 +26,7 @@ function App() {
   return (
     <main>
       {mode === 'sky' ? (
-        <SkyPage onBack={() => window.history.back()} />
+        <SkyPage onBack={() => goBackOr(() => setMode('map'))} />
       ) : (
         <MapPage onOpenSky={() => setMode('sky')} />
       )}
