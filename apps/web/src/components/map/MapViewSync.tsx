@@ -3,6 +3,7 @@ import { useMap } from 'react-leaflet';
 import { MAX_VIEW_RADIUS_KM } from '../../config';
 import { boundsAround } from '../../lib/geo/distance';
 import { useLocationStore } from '../../store/location';
+import { visibleCenter } from './visibleCenter';
 
 /**
  * 스토어의 위치가 바뀌면 지도를 날아가듯 옮김. 처음 내 위치를 얻었을 때도 인천공항에서
@@ -18,7 +19,8 @@ export const LocationSync = () => {
 
   useEffect(() => {
     if (status === 'pending') return;
-    map.flyTo([lat, lon], map.getZoom(), { duration: 2 });
+    const zoom = map.getZoom();
+    map.flyTo(visibleCenter(map, lat, lon, zoom), zoom, { duration: 2 });
   }, [map, lat, lon, status]);
 
   return null;
