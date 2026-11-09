@@ -51,6 +51,9 @@ describe('normalizeAircraft', () => {
   });
 
   it('빈 편명은 callsign을 두지 않는다', () => {
+    expect(
+      normalizeAircraft({ hex: 'a', flight: '@@@@@@@@', lat: 1, lon: 2 }, NOW)?.callsign
+    ).toBeUndefined();
     const a = normalizeAircraft({ hex: 'a', flight: '   ', lat: 1, lon: 2 }, NOW);
     expect(a).not.toBeNull();
     expect(a).not.toHaveProperty('callsign');
@@ -64,6 +67,16 @@ describe('normalizeAircraft', () => {
     expect(normalizeAircraft({ hex: 'a', lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft({ lat: 1, lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft(null, NOW)).toBeNull();
+  });
+});
+
+describe('고도', () => {
+  it('기하 고도(GPS)가 있으면 그 값, 없으면 기압 고도', () => {
+    const base = { hex: 'a', lat: 1, lon: 2 };
+    // 기압이 높은 날 착륙 중: 기압 고도는 마이너스, 기하 고도는 실제 높이에 가까움
+    expect(normalizeAircraft({ ...base, alt_baro: -425, alt_geom: 75 }, NOW)?.altFt).toBe(75);
+    expect(normalizeAircraft({ ...base, alt_baro: 8325 }, NOW)?.altFt).toBe(8325);
+    expect(normalizeAircraft({ ...base }, NOW)?.altFt).toBeUndefined();
   });
 });
 
@@ -91,7 +104,7 @@ describe('adsb.lol 어댑터', () => {
       callsign: 'KAL1234',
       lat: 37.53,
       lon: 127.12,
-      altFt: 8325,
+      altFt: 8600, // 기하 고도(alt_geom)가 있으면 그 값
       speedKt: 251.4,
       trackDeg: 312.6,
       seenAt: NOW - 400,

@@ -20,7 +20,9 @@ export const normalizeAircraft = (
   if (!hex || lat === undefined || lon === undefined) return null;
   if (item.alt_baro === 'ground') return null;
 
-  const callsign = typeof item.flight === 'string' ? item.flight.trim() : '';
+  const flight = typeof item.flight === 'string' ? item.flight.trim() : '';
+  // 편명을 모르는 기체는 "@@@@@@@@"로 오기도 함(ADS-B 편명 칸의 빈 값). 편명 없음으로 처리
+  const callsign = /^@+$/.test(flight) ? '' : flight;
   const seenPos = num(item.seen_pos);
 
   const aircraft: Aircraft = {
@@ -30,7 +32,10 @@ export const normalizeAircraft = (
     seenAt: seenPos !== undefined ? now - seenPos * 1000 : now,
   };
   if (callsign) aircraft.callsign = callsign;
-  const altFt = num(item.alt_baro);
+  // 고도는 기하 고도(GPS, alt_geom)를 먼저 씀 (사용자 결정 2026-11-09).
+  // 기압 고도(alt_baro)는 표준 기압(1013.25hPa) 기준이라, 기압이 높은 날에는 실제보다 낮게 나와
+  // 이착륙 중인 비행기가 -400ft처럼 마이너스가 됐음. 기하 고도가 없는 기체만 기압 고도를 씀
+  const altFt = num(item.alt_geom) ?? num(item.alt_baro);
   if (altFt !== undefined) aircraft.altFt = altFt;
   const speedKt = num(item.gs);
   if (speedKt !== undefined) aircraft.speedKt = speedKt;
@@ -68,8 +73,11 @@ export const normalizeFollowed = (
   if (typeof raw !== 'object' || raw === null) return null;
   const item = raw as Record<string, unknown>;
   const onGround = item.alt_baro === 'ground';
-  // 지상이면 고도 값이 "ground" 문자열이라, 그 필드만 빼고 공통 정규화를 씀
-  const aircraft = normalizeAircraft(onGround ? { ...item, alt_baro: undefined } : item, now);
+  // 지상이면 기압 고도가 "ground" 문자열이고 고도 자체가 의미 없어서, 고도 필드를 빼고 공통 정규화를 씀
+  const aircraft = normalizeAircraft(
+    onGround ? { ...item, alt_baro: undefined, alt_geom: undefined } : item,
+    now
+  );
   return aircraft ? { ...aircraft, onGround } : null;
 };
 
