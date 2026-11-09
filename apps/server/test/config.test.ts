@@ -11,7 +11,7 @@ describe('loadConfig', () => {
       requestTimeoutMs: 5000,
       maxPollIntervalMs: 60_000,
       maxFollows: 20,
-      followIntervalMs: 10_000,
+      followIntervalMs: 5_000,
       region: { lat: 36.5, lon: 127.5, radiusNm: 250 },
       minRequestGapMs: 1100,
     });
