@@ -553,3 +553,110 @@
     height: 48px;
   }
 }
+
+/* ---------- 따라가기 (목업 FollowActive, FollowLost, FollowLanded) ---------- */
+
+/* 따라가는 동안에는 폰에서도 확대·축소 버튼을 보여 주고(지도를 끌 수 없으므로), 내 위치 버튼은 숨김 */
+.map-root.is-following .zoom-buttons {
+  display: flex;
+}
+
+.map-root.is-following .round-button {
+  display: none;
+}
+
+.follow-bar {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.follow-pill {
+  height: 44px;
+  padding: 0 14px;
+  border-radius: 22px;
+  background: var(--accent);
+  color: #ffffff;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: 0 4px 12px rgba(26, 84, 230, 0.3);
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.follow-pill.is-warn {
+  background: var(--warn-bg);
+  color: var(--warn-text);
+  box-shadow: var(--shadow-chip);
+}
+
+.follow-pill.is-done {
+  background: var(--card);
+  color: var(--live-text);
+  box-shadow: var(--shadow-chip);
+}
+
+.follow-end {
+  height: 44px;
+  padding: 0 16px;
+  border-radius: 22px;
+  border: none;
+  background: var(--card);
+  color: var(--text);
+  font-size: 14px;
+  font-weight: 600;
+  box-shadow: var(--shadow-chip);
+  flex-shrink: 0;
+}
+
+.follow-distance {
+  align-self: flex-start;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 16px;
+  background: var(--card);
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  color: var(--text-sub);
+  box-shadow: 0 1px 2px rgba(20, 24, 31, 0.12);
+}
+
+.sheet-kind.is-following {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--accent);
+}
+
+.sheet-kind.is-following .live-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent);
+  box-shadow: 0 0 0 3px rgba(26, 84, 230, 0.18);
+}
+
+.sheet-empty-icon.is-live {
+  background: #e7f5ee;
+}
+
+.sheet-empty-icon.is-warn {
+  background: var(--warn-bg);
+}
+
+.stat-value.is-small {
+  font-size: 15px;
+}
+
+.button.is-follow-start {
+  background: var(--accent);
+  color: #ffffff;
+}
