@@ -18,7 +18,7 @@ import {
   setMarkerClass,
   setRotation,
 } from './aircraftIcon';
-import { keepInView } from './visibleCenter';
+import { keepInView, placeMarkerExactly } from './visibleCenter';
 
 /** 마커 하나에 대해 기억하는 것 */
 type Entry = {
@@ -160,6 +160,7 @@ export function AircraftLayer({
           entry.shown = pos;
           // 따라가기: 마커를 옮긴 같은 프레임에 지도도 옮겨서, 비행기가 화면 가운데에 고정돼 보이게 함
           if (entry.aircraft.hex === followRef.current) {
+            placeMarkerExactly(map, entry.marker, pos.lat, pos.lon);
             keepInView(map, pos.lat, pos.lon);
             onFollowFrameRef.current?.(pos);
           }
