@@ -27,6 +27,8 @@ type FollowState = {
   landedAt: number | null;
   /** 서버가 따라가기를 거절함 (서버 전체 상한) */
   rejected: boolean;
+  /** 따라가는 동안 가장 높았던 고도(ft). 착륙 화면의 "최고 고도" */
+  maxAltFt: number | null;
 };
 
 const IDLE: FollowState = {
@@ -37,6 +39,7 @@ const IDLE: FollowState = {
   traveledKm: 0,
   landedAt: null,
   rejected: false,
+  maxAltFt: null,
 };
 
 export const useFollowStore = create<FollowState>(() => IDLE);
@@ -52,6 +55,7 @@ export const startFollow = (aircraft: Aircraft) => {
     startedAt: serverNow(),
     last: { ...aircraft, onGround: false },
     trail: [{ lat: aircraft.lat, lon: aircraft.lon }],
+    maxAltFt: aircraft.altFt ?? null,
   });
 };
 
@@ -81,5 +85,7 @@ export const applyFollowSnapshot = (snapshot: FollowSnapshot) => {
     trail: jumped ? [point] : moved ? [...state.trail, point] : state.trail,
     traveledKm: state.traveledKm + (moved && !jumped ? step : 0),
     landedAt: a.onGround ? a.seenAt : null,
+    maxAltFt:
+      a.altFt === undefined ? state.maxAltFt : Math.max(state.maxAltFt ?? a.altFt, a.altFt),
   });
 };

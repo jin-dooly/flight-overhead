@@ -49,6 +49,12 @@ describe('따라가기 스토어', () => {
     expect(s.trail).toEqual([{ lat: 40, lon: 127 }]);
   });
 
+  it('따라가는 동안 가장 높았던 고도를 기억', () => {
+    applyFollowSnapshot({ ...snap(37.51, T0 + 6000), aircraft: { ...snap(37.51, T0 + 6000).aircraft!, altFt: 35000 } });
+    applyFollowSnapshot({ ...snap(37.52, T0 + 12_000), aircraft: { ...snap(37.52, T0 + 12_000).aircraft!, altFt: 20000 } });
+    expect(useFollowStore.getState().maxAltFt).toBe(35000);
+  });
+
   it('지상으로 바뀌면 착륙 시각을 정하고, 그 뒤 메시지는 무시', () => {
     applyFollowSnapshot(snap(37.51, T0 + 6000, true));
     expect(useFollowStore.getState().landedAt).toBe(T0 + 6000);
