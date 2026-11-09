@@ -5,6 +5,7 @@ import {
   applyCorrection,
   CONVERGE_MS,
   MAX_PREDICT_MS,
+  NEAR_GROUND_PREDICT_MS,
   predictPosition,
   startCorrection,
 } from '../src/lib/geo/interpolate';
@@ -66,6 +67,28 @@ describe('predictPosition', () => {
     const atLimit = predictPosition(aircraft(), T0 + MAX_PREDICT_MS);
     const later = predictPosition(aircraft(), T0 + MAX_PREDICT_MS * 3);
     expect(later).toEqual(atLimit);
+  });
+
+  it('예측 상한을 따로 주면 그 시간까지 예측함 (따라가기는 3분)', () => {
+    const at60 = predictPosition(aircraft(), T0 + 60_000, 180_000);
+    const at30 = predictPosition(aircraft(), T0 + 30_000, 180_000);
+    expect(at60.lat).toBeGreaterThan(at30.lat);
+    expect(predictPosition(aircraft(), T0 + 60_000)).toEqual(predictPosition(aircraft(), T0 + MAX_PREDICT_MS));
+  });
+
+  it('착륙한 비행기(onGround)는 따라가기 예측 시간이 길어도 움직이지 않음', () => {
+    const landed = { ...aircraft(), onGround: true };
+    expect(predictPosition(landed, T0 + 60_000, 180_000)).toEqual({ lat: 37.5, lon: 127 });
+  });
+
+  it('지면 근처(100ft 미만)에서는 3초까지만 예측 (활주 중 감속을 모르니 오래 가면 지나침)', () => {
+    const rolling = aircraft({ altFt: 40 });
+    expect(predictPosition(rolling, T0 + 30_000)).toEqual(
+      predictPosition(rolling, T0 + NEAR_GROUND_PREDICT_MS)
+    );
+    expect(predictPosition(aircraft({ altFt: 5000 }), T0 + 30_000).lat).toBeGreaterThan(
+      predictPosition(rolling, T0 + 30_000).lat
+    );
   });
 
   it('seenAt이 지금보다 미래(시계 오차)면 뒤로 가지 않고 그대로', () => {

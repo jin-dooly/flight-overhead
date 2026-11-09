@@ -1,4 +1,5 @@
 import type { Aircraft } from '@flight/shared';
+import { isNearGround } from '../altitude';
 import type { LatLon } from './distance';
 
 /** 위도 1도의 길이(km). 지구 반지름 6371km 기준 */
@@ -26,12 +27,27 @@ const wrapLon = (lon: number) => ((((lon + 180) % 360) + 360) % 360) - 180;
  * 지구를 평면으로 보고 계산함. 30초 동안 움직이는 거리(최대 10km 안팎)에서는 구면 공식과 차이가 수 m라서
  * 화면에서 구분되지 않고, 계산이 단순해 매 프레임 수십 대를 돌려도 부담이 없음
  */
-export const predictPosition = (aircraft: Aircraft, atMs: number): LatLon => {
-  const { lat, lon, speedKt, trackDeg, seenAt } = aircraft;
+/**
+ * 지면 근처(이착륙 중)에서는 이 시간까지만 예측함.
+ * 착륙 후 활주 중에는 비행기가 계속 느려지는데, 예측은 마지막 속도 그대로 가정해서
+ * 오래 예측하면 활주로를 지나쳐 달려가는 것처럼 보였음(사용자 제보 2026-11-09)
+ */
+export const NEAR_GROUND_PREDICT_MS = 3_000;
+
+export const predictPosition = (
+  aircraft: Aircraft & { onGround?: boolean },
+  atMs: number,
+  /** 이 시간까지만 예측하고 멈춤. 지도는 30초, 따라가기는 신호 대기시간(3분)까지 */
+  maxPredictMs: number = MAX_PREDICT_MS
+): LatLon => {
+  const { lat, lon, speedKt, trackDeg, seenAt, altFt, onGround } = aircraft;
   if (speedKt === undefined || trackDeg === undefined) return { lat, lon };
+  // 착륙한 비행기(따라가기에서 지상으로 확인됨)는 움직이지 않음. 지상 이동은 느리고 방향이 자주 바뀌어 예측이 맞지 않음
+  if (onGround) return { lat, lon };
 
   // 시계 오차로 seenAt이 미래일 수 있으므로 0 아래로 내려가지 않게 함
-  const elapsedMs = Math.min(Math.max(atMs - seenAt, 0), MAX_PREDICT_MS);
+  const limitMs = isNearGround(altFt) ? Math.min(maxPredictMs, NEAR_GROUND_PREDICT_MS) : maxPredictMs;
+  const elapsedMs = Math.min(Math.max(atMs - seenAt, 0), limitMs);
   const km = speedKt * KM_PER_NM * (elapsedMs / 3_600_000);
   const track = (trackDeg * Math.PI) / 180;
 
