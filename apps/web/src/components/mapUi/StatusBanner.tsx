@@ -1,8 +1,10 @@
+import { useCallback, useState } from 'react';
 import { DEFAULT_LOCATION } from '../../config';
 import { formatAgo } from '../../lib/format';
 import type { DataStatus } from '../../lib/mapStatus';
 import { useLocationStore } from '../../store/location';
-import { ClockIcon, PinIcon, PinOffIcon, WifiOffIcon } from './icons';
+import { ClockIcon, HelpIcon, PinOffIcon, RefreshIcon, WifiOffIcon } from './icons';
+import { LocationHelpModal } from './LocationHelpModal';
 
 /**
  * 상단 칩 아래 안내 띠. 여러 상황이 겹치면 사용자가 가장 먼저 알아야 할 것 하나만 보여 줌.
@@ -18,6 +20,8 @@ export const StatusBanner = ({
 }) => {
   const locationStatus = useLocationStore((s) => s.status);
   const requestLocation = useLocationStore((s) => s.requestLocation);
+  const [helpOpen, setHelpOpen] = useState(false);
+  const closeHelp = useCallback(() => setHelpOpen(false), []);
 
   if (status === 'reconnecting') {
     return (
@@ -50,22 +54,27 @@ export const StatusBanner = ({
     );
   }
 
+  // 위치를 기다리는 중. 처음 들어왔을 때는 지도 전체를 덮는 안내(LocationPendingOverlay)가 위에 있어서
+  // 이 띠는 가려지고, "다시 시도"를 눌렀을 때 보임
   if (locationStatus === 'pending') {
     return (
-      <div role="status" className="banner is-neutral">
-        <PinIcon size={18} color="#1A54E6" />
+      <div role="status" className="banner is-dark">
+        <span className="spin" style={{ display: 'inline-flex' }}>
+          <RefreshIcon size={18} strokeWidth={2} color="#9DB8FF" />
+        </span>
         <div className="banner-text">
           <span className="banner-title">내 위치를 확인하는 중이에요</span>
-          <span className="banner-desc">위치 권한을 허용하면 내 머리 위 비행기를 보여 드려요.</span>
+          <span className="banner-desc">허용 창이 뜨면 허용을 눌러 주세요</span>
         </div>
       </div>
     );
   }
 
   if (locationStatus === 'denied' || locationStatus === 'unavailable') {
+    // 검은 배경 (사용자 피드백 2026-11-09: "서버와 연결이 끊겼어요"와 같은 모양으로)
     return (
-      <div role="status" className="banner is-warn has-action">
-        <PinOffIcon color="#8A5300" />
+      <div role="status" className="banner is-dark has-action">
+        <PinOffIcon color="#F5C26B" />
         <div className="banner-text">
           <span className="banner-title">기본 위치로 보는 중</span>
           <span className="banner-desc">
@@ -74,9 +83,18 @@ export const StatusBanner = ({
               : `위치를 찾지 못해서 ${DEFAULT_LOCATION.label} 기준으로 보여 드려요`}
           </span>
         </div>
+        <button
+          type="button"
+          className="banner-help"
+          aria-label="위치 권한을 켜는 방법"
+          onClick={() => setHelpOpen(true)}
+        >
+          <HelpIcon />
+        </button>
         <button type="button" className="banner-action" onClick={requestLocation}>
           다시 시도
         </button>
+        {helpOpen && <LocationHelpModal onClose={closeHelp} />}
       </div>
     );
   }
