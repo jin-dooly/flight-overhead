@@ -18,7 +18,7 @@ import {
   setMarkerClass,
   setRotation,
 } from './aircraftIcon';
-import { visibleCenter } from './visibleCenter';
+import { keepInView, placeMarkerExactly } from './visibleCenter';
 
 /** 마커 하나에 대해 기억하는 것 */
 type Entry = {
@@ -45,6 +45,8 @@ export function AircraftLayer({
   highlightHex = null,
   outsideHex = null,
   followHex = null,
+  onFollowFrame,
+  maxPredictMs = MAX_PREDICT_MS,
 }: {
   aircraft: Aircraft[];
   onSelect: (hex: string) => void;
@@ -54,6 +56,10 @@ export function AircraftLayer({
   outsideHex?: string | null;
   /** 따라가는 비행기. 매 프레임 지도 중심을 이 비행기의 예상 위치로 옮김 */
   followHex?: string | null;
+  /** 따라가는 비행기를 그린 위치를 매 프레임 알려 줌 (예측 꼬리를 비행기 위치까지 잇는 데 씀) */
+  onFollowFrame?: (pos: LatLon) => void;
+  /** 마지막 위치에서 이 시간까지만 예측하고, 넘으면 멈추고 흐리게. 따라가기는 신호 대기시간과 같게 */
+  maxPredictMs?: number;
 }) {
   const map = useMap();
   const entries = useRef(new Map<string, Entry>());
@@ -61,9 +67,13 @@ export function AircraftLayer({
   // 새 마커를 만들 때도 강조 여부를 바로 맞추려고 최신 값을 ref에 둠
   const classRef = useRef({ highlightHex, outsideHex });
   const followRef = useRef(followHex);
+  const onFollowFrameRef = useRef(onFollowFrame);
+  const maxPredictRef = useRef(maxPredictMs);
   useEffect(() => {
     followRef.current = followHex;
-  }, [followHex]);
+    onFollowFrameRef.current = onFollowFrame;
+    maxPredictRef.current = maxPredictMs;
+  }, [followHex, onFollowFrame, maxPredictMs]);
 
   // 마커 클릭 핸들러는 마커를 만들 때 한 번만 붙이므로, 클릭 순간에 최신 onSelect를 꺼내 쓰게 함.
   // 렌더링 중에 ref를 바꾸지 않도록 effect 안에서 갱신
@@ -88,7 +98,7 @@ export function AircraftLayer({
 
     for (const a of aircraft) {
       seen.add(a.hex);
-      const predicted = predictPosition(a, now);
+      const predicted = predictPosition(a, now, maxPredictRef.current);
       const entry = entries.current.get(a.hex);
 
       if (entry) {
@@ -141,21 +151,21 @@ export function AircraftLayer({
       if (!zooming) {
         const now = serverNow();
         for (const entry of entries.current.values()) {
-          const predicted = predictPosition(entry.aircraft, now);
+          const predicted = predictPosition(entry.aircraft, now, maxPredictRef.current);
           const pos = applyCorrection(predicted, entry.correction, now);
           if (entry.correction && now - entry.correction.startedAt >= CONVERGE_MS) {
             entry.correction = null; // 수렴이 끝났으면 더 계산하지 않음
           }
           entry.marker.setLatLng([pos.lat, pos.lon]);
           entry.shown = pos;
-          // 따라가기: 마커를 옮긴 같은 프레임에 지도도 옮겨서, 비행기가 화면 가운데에 고정돼 보이게 함.
-          // 애니메이션 없이 바로 옮겨야 매 프레임 이동이 서로 겹치지 않음
+          // 따라가기: 마커를 옮긴 같은 프레임에 지도도 옮겨서, 비행기가 화면 가운데에 고정돼 보이게 함
           if (entry.aircraft.hex === followRef.current) {
-            const zoom = map.getZoom();
-            map.setView(visibleCenter(map, pos.lat, pos.lon, zoom), zoom, { animate: false });
+            placeMarkerExactly(map, entry.marker, pos.lat, pos.lon);
+            keepInView(map, pos.lat, pos.lon);
+            onFollowFrameRef.current?.(pos);
           }
-          // 30초 넘게 새 위치가 없으면 예측도 멈추므로(MAX_PREDICT_MS) 흐리게 보여 줌 (기획서: 30초 미수신은 흐리게)
-          const stale = now - entry.aircraft.seenAt > MAX_PREDICT_MS;
+          // 예측 상한(지도 30초, 따라가기 3분)을 넘게 새 위치가 없으면 예측도 멈추므로 흐리게 보여 줌
+          const stale = now - entry.aircraft.seenAt > maxPredictRef.current;
           if (stale !== entry.stale) {
             entry.stale = stale;
             setMarkerClass(entry.marker, 'is-stale', stale);

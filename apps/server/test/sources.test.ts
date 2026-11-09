@@ -3,7 +3,7 @@ import adsbFiSample from './fixtures/adsbFi.json';
 import adsbLolSample from './fixtures/adsbLol.json';
 import { createAdsbFiSource } from '../src/sources/adsbFi';
 import { createAdsbLolSource } from '../src/sources/adsbLol';
-import { normalizeAircraft } from '../src/sources/normalize';
+import { normalizeAircraft, normalizeResponse, responseTime } from '../src/sources/normalize';
 
 const NOW = 1_762_534_800_000;
 
@@ -51,6 +51,9 @@ describe('normalizeAircraft', () => {
   });
 
   it('빈 편명은 callsign을 두지 않는다', () => {
+    expect(
+      normalizeAircraft({ hex: 'a', flight: '@@@@@@@@', lat: 1, lon: 2 }, NOW)?.callsign
+    ).toBeUndefined();
     const a = normalizeAircraft({ hex: 'a', flight: '   ', lat: 1, lon: 2 }, NOW);
     expect(a).not.toBeNull();
     expect(a).not.toHaveProperty('callsign');
@@ -64,6 +67,42 @@ describe('normalizeAircraft', () => {
     expect(normalizeAircraft({ hex: 'a', lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft({ lat: 1, lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft(null, NOW)).toBeNull();
+  });
+});
+
+describe('응답 시각 기준 위치 시각', () => {
+  it('seen_pos는 받은 시각이 아니라 응답 시각(now)에서 뺌. ms와 초 단위 둘 다', () => {
+    const plane = { hex: 'a', lat: 1, lon: 2, seen_pos: 1.5 };
+    // adsb.lol: ms, 응답이 2초 전에 만들어짐
+    expect(normalizeResponse({ now: NOW - 2000, ac: [plane] }, 'ac', NOW)[0].seenAt).toBe(NOW - 3500);
+    // adsb.fi: 초 단위
+    expect(normalizeResponse({ now: (NOW - 2000) / 1000, aircraft: [plane] }, 'aircraft', NOW)[0].seenAt).toBe(
+      NOW - 3500
+    );
+  });
+
+  it('응답 시각이 없거나 1분 넘게 어긋나면 받은 시각', () => {
+    expect(responseTime({}, NOW)).toBe(NOW);
+    expect(responseTime({ now: NOW - 120_000 }, NOW)).toBe(NOW);
+    expect(responseTime({ now: NOW + 30_000 }, NOW)).toBe(NOW + 30_000);
+  });
+});
+
+describe('선회율', () => {
+  it('track_rate가 있으면 trackRateDegS로, 없으면 비움', () => {
+    const base = { hex: 'a', lat: 1, lon: 2, track: 90 };
+    expect(normalizeAircraft({ ...base, track_rate: -0.94 }, NOW)?.trackRateDegS).toBe(-0.94);
+    expect(normalizeAircraft(base, NOW)).not.toHaveProperty('trackRateDegS');
+  });
+});
+
+describe('고도', () => {
+  it('기하 고도(GPS)가 있으면 그 값, 없으면 기압 고도', () => {
+    const base = { hex: 'a', lat: 1, lon: 2 };
+    // 기압이 높은 날 착륙 중: 기압 고도는 마이너스, 기하 고도는 실제 높이에 가까움
+    expect(normalizeAircraft({ ...base, alt_baro: -425, alt_geom: 75 }, NOW)?.altFt).toBe(75);
+    expect(normalizeAircraft({ ...base, alt_baro: 8325 }, NOW)?.altFt).toBe(8325);
+    expect(normalizeAircraft({ ...base }, NOW)?.altFt).toBeUndefined();
   });
 });
 
@@ -91,7 +130,7 @@ describe('adsb.lol 어댑터', () => {
       callsign: 'KAL1234',
       lat: 37.53,
       lon: 127.12,
-      altFt: 8325,
+      altFt: 8600, // 기하 고도(alt_geom)가 있으면 그 값
       speedKt: 251.4,
       trackDeg: 312.6,
       seenAt: NOW - 400,

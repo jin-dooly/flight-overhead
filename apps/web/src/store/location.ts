@@ -21,6 +21,13 @@ type LocationState = {
 // 위치는 지도 모드와 하늘 모드가 같이 쓰므로 페이지 밖(스토어)에 둠.
 // 페이지가 다시 마운트돼도 권한 요청이 반복되지 않음.
 // 정확한 좌표는 브라우저 안에서만 쓰고, 서버에는 toGrid()로 반올림한 값만 보냄. 로그로도 남기지 않음.
+/**
+ * 위치 요청이 실패로 끝나도 "확인 중" 상태를 최소 이만큼은 보여 줌.
+ * 권한이 꺼져 있으면 브라우저가 묻지도 않고 바로 실패를 돌려줘서, "다시 시도"를 눌러도
+ * 아무 일도 없는 것처럼 보였음. 잠깐이라도 확인 중 표시가 지나가야 눌렀다는 게 전달됨
+ */
+const MIN_PENDING_MS = 800;
+
 export const useLocationStore = create<LocationState>((set, get) => {
   let inFlight = false;
 
@@ -35,6 +42,7 @@ export const useLocationStore = create<LocationState>((set, get) => {
         return;
       }
       inFlight = true;
+      const startedAt = Date.now();
       // 이미 내 위치가 있으면 "다시 찾는 중"으로 바꾸지 않음(화면이 깜빡이지 않게)
       if (get().status !== 'granted') set({ status: 'pending' });
       navigator.geolocation.getCurrentPosition(
@@ -47,15 +55,14 @@ export const useLocationStore = create<LocationState>((set, get) => {
           });
         },
         (err) => {
-          inFlight = false;
-          // 이전에 얻은 내 위치가 있으면 그대로 두고, 없을 때만 기본 위치로
-          if (get().status === 'granted') return;
-          set({
-            status:
-              err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable',
-            lat: DEFAULT_LOCATION.lat,
-            lon: DEFAULT_LOCATION.lon,
-          });
+          const status = err.code === err.PERMISSION_DENIED ? 'denied' : 'unavailable';
+          const wait = Math.max(0, MIN_PENDING_MS - (Date.now() - startedAt));
+          setTimeout(() => {
+            inFlight = false;
+            // 이전에 얻은 내 위치가 있으면 그대로 두고, 없을 때만 기본 위치로
+            if (get().status === 'granted') return;
+            set({ status, lat: DEFAULT_LOCATION.lat, lon: DEFAULT_LOCATION.lon });
+          }, wait);
         },
         { enableHighAccuracy: false, timeout: 10_000, maximumAge: 60_000 }
       );

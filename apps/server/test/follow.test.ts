@@ -29,7 +29,7 @@ const airborne = {
   lon: 128.2,
   seen_pos: 1.5,
 };
-const onGround = { ...airborne, alt_baro: 'ground', gs: 12 };
+const onGround = { ...airborne, alt_baro: 'ground', alt_geom: 75, gs: 12 };
 
 describe('따라가기 정규화', () => {
   it('공중 기체는 onGround false', () => {

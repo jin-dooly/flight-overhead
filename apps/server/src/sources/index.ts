@@ -48,6 +48,9 @@ export const createFallbackFetcher = (
   };
 };
 
+// 메인은 adsb.lol, 예비는 adsb.fi (2026-11-09 사용자 결정으로 다시 되돌림).
+// 잠깐 adsb.fi를 메인으로 썼는데, 응답이 약 2초 늦게 만들어지고(adsb.lol은 약 1초) 시각이 초 단위라
+// 따라가기가 어색해 보였음. adsb.lol의 호출 제한(429)은 지역 통째 조회로 요청 수를 줄여서 대응함
 export const createDefaultFetcher = (opts: SourceOptions): SnapshotFetcher =>
   createFallbackFetcher(createAdsbLolSource(opts), createAdsbFiSource(opts));
 

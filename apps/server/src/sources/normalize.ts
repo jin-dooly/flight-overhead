@@ -20,7 +20,9 @@ export const normalizeAircraft = (
   if (!hex || lat === undefined || lon === undefined) return null;
   if (item.alt_baro === 'ground') return null;
 
-  const callsign = typeof item.flight === 'string' ? item.flight.trim() : '';
+  const flight = typeof item.flight === 'string' ? item.flight.trim() : '';
+  // 편명을 모르는 기체는 "@@@@@@@@"로 오기도 함(ADS-B 편명 칸의 빈 값). 편명 없음으로 처리
+  const callsign = /^@+$/.test(flight) ? '' : flight;
   const seenPos = num(item.seen_pos);
 
   const aircraft: Aircraft = {
@@ -30,13 +32,40 @@ export const normalizeAircraft = (
     seenAt: seenPos !== undefined ? now - seenPos * 1000 : now,
   };
   if (callsign) aircraft.callsign = callsign;
-  const altFt = num(item.alt_baro);
+  // 고도는 기하 고도(GPS, alt_geom)를 먼저 씀 (사용자 결정 2026-11-09).
+  // 기압 고도(alt_baro)는 표준 기압(1013.25hPa) 기준이라, 기압이 높은 날에는 실제보다 낮게 나와
+  // 이착륙 중인 비행기가 -400ft처럼 마이너스가 됐음. 기하 고도가 없는 기체만 기압 고도를 씀
+  const altFt = num(item.alt_geom) ?? num(item.alt_baro);
   if (altFt !== undefined) aircraft.altFt = altFt;
   const speedKt = num(item.gs);
   if (speedKt !== undefined) aircraft.speedKt = speedKt;
   const trackDeg = num(item.track);
   if (trackDeg !== undefined) aircraft.trackDeg = trackDeg;
+  // 선회율은 일부 기체만 보냄(2026-11-09 확인: 인천 근처 36대 중 17대)
+  const trackRate = num(item.track_rate);
+  if (trackRate !== undefined) aircraft.trackRateDegS = trackRate;
   return aircraft;
+};
+
+/** 응답 시각이 우리 서버 시계와 이보다 크게 다르면, 응답 시각을 믿지 않고 받은 시각을 씀 */
+const MAX_CLOCK_SKEW_MS = 60_000;
+
+/**
+ * 위치 시각(seenAt)을 계산할 기준 시각.
+ * `seen_pos`는 "응답을 만든 시각(now)으로부터 몇 초 전"이라서, 받은 시각이 아니라 응답 시각에서 빼야 맞음.
+ * adsb.fi 응답은 만들어진 지 약 2초 뒤에 도착해서(2026-11-09 측정), 받은 시각에서 빼면
+ * 위치가 2초 신선한 것으로 잘못 계산되고 예측이 그만큼 뒤처졌음.
+ * - adsb.lol은 ms, adsb.fi는 초 단위(정수)로 옴
+ * - 응답 시각이 없거나 우리 시계와 1분 넘게 다르면(어느 쪽 시계가 틀림) 받은 시각을 씀
+ */
+export const responseTime = (body: unknown, receivedAt: number): number => {
+  const raw =
+    typeof body === 'object' && body !== null
+      ? num((body as Record<string, unknown>).now)
+      : undefined;
+  if (raw === undefined) return receivedAt;
+  const ms = raw < 1e12 ? raw * 1000 : raw;
+  return Math.abs(ms - receivedAt) > MAX_CLOCK_SKEW_MS ? receivedAt : ms;
 };
 
 /** 응답 본문에서 `listKey` 배열을 꺼내 정규화. 배열이 없으면 형식 오류로 보고 throw */
@@ -52,8 +81,9 @@ export const normalizeResponse = (
   if (!Array.isArray(list)) {
     throw new Error(`응답에 "${listKey}" 배열이 없음`);
   }
+  const base = responseTime(body, now);
   return list
-    .map((raw) => normalizeAircraft(raw, now))
+    .map((raw) => normalizeAircraft(raw, base))
     .filter((a): a is Aircraft => a !== null);
 };
 
@@ -68,8 +98,11 @@ export const normalizeFollowed = (
   if (typeof raw !== 'object' || raw === null) return null;
   const item = raw as Record<string, unknown>;
   const onGround = item.alt_baro === 'ground';
-  // 지상이면 고도 값이 "ground" 문자열이라, 그 필드만 빼고 공통 정규화를 씀
-  const aircraft = normalizeAircraft(onGround ? { ...item, alt_baro: undefined } : item, now);
+  // 지상이면 기압 고도가 "ground" 문자열이고 고도 자체가 의미 없어서, 고도 필드를 빼고 공통 정규화를 씀
+  const aircraft = normalizeAircraft(
+    onGround ? { ...item, alt_baro: undefined, alt_geom: undefined } : item,
+    now
+  );
   return aircraft ? { ...aircraft, onGround } : null;
 };
 
@@ -87,8 +120,9 @@ export const normalizeHexResponse = (
     typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
   const list = [record.ac, record.aircraft].find(Array.isArray);
   if (!list) throw new Error('응답에 "ac"나 "aircraft" 배열이 없음');
+  const base = responseTime(body, now);
   for (const raw of list) {
-    const followed = normalizeFollowed(raw, now);
+    const followed = normalizeFollowed(raw, base);
     if (followed && followed.hex.toLowerCase() === hex) return followed;
   }
   return null;

@@ -18,6 +18,12 @@ describe('formatAltitude', () => {
   it('값이 없으면 null', () => {
     expect(formatAltitude(undefined)).toBeNull();
   });
+
+  it('100ft보다 낮거나 마이너스면 "지면 근처"', () => {
+    expect(formatAltitude(-425)).toEqual({ main: '지면 근처', sub: '100 ft 미만' });
+    expect(formatAltitude(40)).toEqual({ main: '지면 근처', sub: '100 ft 미만' });
+    expect(formatAltitude(100)?.main).toBe('30 m');
+  });
 });
 
 describe('formatSpeed', () => {

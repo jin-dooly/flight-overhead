@@ -6,12 +6,14 @@ export type Aircraft = {
   callsign?: string;
   lat: number;
   lon: number;
-  /** 기압 고도(ft). 지상 기체는 서버에서 제외하므로 공중 기체만 옴 */
+  /** 고도(ft). 기하 고도(GPS)가 있으면 그 값, 없으면 기압 고도. 지상 기체는 서버에서 제외하므로 공중 기체만 옴 */
   altFt?: number;
   /** 대지 속도(kt) */
   speedKt?: number;
   /** 진행 방향 0~360 */
   trackDeg?: number;
+  /** 선회율(초당 도). +는 오른쪽(시계 방향)으로 도는 중. 선회 중 위치를 곡선으로 예측하는 데 씀 */
+  trackRateDegS?: number;
   /** 위치를 받은 시각(ms) */
   seenAt: number;
 };

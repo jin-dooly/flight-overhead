@@ -27,6 +27,8 @@ type FollowState = {
   landedAt: number | null;
   /** 서버가 따라가기를 거절함 (서버 전체 상한) */
   rejected: boolean;
+  /** 따라가는 동안 가장 높았던 고도(ft). 착륙 화면의 "최고 고도" */
+  maxAltFt: number | null;
 };
 
 const IDLE: FollowState = {
@@ -37,6 +39,7 @@ const IDLE: FollowState = {
   traveledKm: 0,
   landedAt: null,
   rejected: false,
+  maxAltFt: null,
 };
 
 export const useFollowStore = create<FollowState>(() => IDLE);
@@ -52,10 +55,21 @@ export const startFollow = (aircraft: Aircraft) => {
     startedAt: serverNow(),
     last: { ...aircraft, onGround: false },
     trail: [{ lat: aircraft.lat, lon: aircraft.lon }],
+    maxAltFt: aircraft.altFt ?? null,
   });
 };
 
 export const stopFollow = () => useFollowStore.setState(IDLE);
+
+/**
+ * 지상 신호 없이 착륙으로 확정함 (공항 근처 저고도에서 끊김, lib/follow.ts의 looksLanded).
+ * 마지막 위치 시각을 착륙 시각으로 쓰고, 지상으로 표시해서 예측도 멈추게 함
+ */
+export const markLanded = () => {
+  const { last, landedAt } = useFollowStore.getState();
+  if (!last || landedAt !== null) return;
+  useFollowStore.setState({ landedAt: last.seenAt, last: { ...last, onGround: true } });
+};
 
 /** 서버가 따라가기 토픽 구독을 거절했을 때 */
 export const markFollowRejected = () => useFollowStore.setState({ rejected: true });
@@ -81,5 +95,7 @@ export const applyFollowSnapshot = (snapshot: FollowSnapshot) => {
     trail: jumped ? [point] : moved ? [...state.trail, point] : state.trail,
     traveledKm: state.traveledKm + (moved && !jumped ? step : 0),
     landedAt: a.onGround ? a.seenAt : null,
+    maxAltFt:
+      a.altFt === undefined ? state.maxAltFt : Math.max(state.maxAltFt ?? a.altFt, a.altFt),
   });
 };

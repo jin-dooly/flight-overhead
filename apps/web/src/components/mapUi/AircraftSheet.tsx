@@ -38,7 +38,10 @@ type Props = {
  */
 export const AircraftSheet = (props: Props) => {
   const { status, hasSnapshot, card } = props;
+  const locating = useLocationStore((s) => s.status === 'pending');
 
+  // 위치를 다시 찾는 동안(안내 띠의 "다시 시도")에는 기본 위치 기준 값이 틀린 값이 되므로 모두 "-"로 비움
+  if (locating && hasSnapshot) return <LocatingSheet />;
   if (!hasSnapshot) return <LoadingSheet status={status} />;
   if (!card) return <EmptySheet {...props} />;
   return <DetailSheet {...props} card={card} />;
@@ -223,3 +226,43 @@ const LoadingSheet = ({ status }: { status: DataStatus }) => {
     </section>
   );
 };
+
+/**
+ * 내 위치를 다시 찾는 중 (사용자 피드백 2026-11-09).
+ * 상세 카드와 같은 모양에 값만 모두 "-"로 비워서, 지금 보이는 값이 아직 내 위치 기준이 아니라는 걸 분명히 함
+ */
+const LocatingSheet = () => (
+  <section aria-label="내 위치를 확인하는 중" className="sheet is-locating" aria-busy="true">
+    <div className="sheet-handle" />
+    <div className="sheet-head">
+      <span className="sheet-kind locating-kind">
+        <span className="spin" style={{ display: 'inline-flex' }}>
+          <RefreshIcon size={12} color="#1A54E6" />
+        </span>
+        내 위치를 확인하는 중
+      </span>
+      <span className="sheet-ago">-</span>
+    </div>
+    <div className="sheet-main">
+      <div className="sheet-id">
+        <span className="callsign">-</span>
+        <span className="caption">기체 ID -</span>
+      </div>
+      <div className="sheet-distance">
+        <span className="distance">
+          -<small>km</small>
+        </span>
+        <span className="caption">나와의 거리</span>
+      </div>
+    </div>
+    <div className="stats">
+      {['고도', '속도', '방향'].map((label) => (
+        <div className="stat" key={label}>
+          <span className="stat-label">{label}</span>
+          <span className="stat-value">-</span>
+          <span className="stat-sub">-</span>
+        </div>
+      ))}
+    </div>
+  </section>
+);

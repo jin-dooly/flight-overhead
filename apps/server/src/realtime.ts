@@ -88,7 +88,7 @@ export const connectFollowPollerToBroker = (
     fetchFollow: FollowFetcher;
     intervalMs: number;
     maxIntervalMs: number;
-    spacer: RequestSpacer;
+    spacer: RequestSpacer | null;
     log?: (message: string) => void;
   }
 ): FollowPoller => {

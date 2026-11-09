@@ -83,9 +83,13 @@ describe('서버 통합', () => {
     await client.subscribeAsync(['flights/37.5/127.1', 'status/source']);
 
     await waitFor(() => messages.size === 2);
-    expect(JSON.parse(messages.get('flights/37.5/127.1')!)).toEqual(snapshot);
+    // 한반도 안 격자는 지역 통째 조회 결과에서 자기 반경 안 비행기만 받음.
+    // fetchedAt은 보내는 시각으로 바뀜(브라우저 시계 보정용)
+    const received = JSON.parse(messages.get('flights/37.5/127.1')!) as Snapshot;
+    expect(received.aircraft).toEqual(snapshot.aircraft);
+    expect(received.source).toBe('adsb.fi');
     expect(messages.get('status/source')).toBe('fallback');
-    expect(fetchSnapshot).toHaveBeenCalledWith(37.5, 127.1, 17);
+    expect(fetchSnapshot).toHaveBeenCalledWith(36.5, 127.5, 250);
     expect(await health(port)).toEqual({
       status: 'ok',
       activeGrids: 1,

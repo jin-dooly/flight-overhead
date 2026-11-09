@@ -1,3 +1,5 @@
+import { isNearGround, NEAR_GROUND_FT } from './altitude';
+
 /** 카드에 보여 줄 값. 큰 글자(main)와 그 아래 원래 단위(sub) */
 export type DisplayValue = { main: string; sub: string };
 
@@ -6,14 +8,18 @@ const KT_TO_KMH = 1.852;
 
 const number = (value: number) => value.toLocaleString('ko-KR');
 
-/** 고도. 항공에서 쓰는 ft는 작게, 익숙한 m를 크게. m는 10m 단위로 반올림 (기압 고도라 그 이상 정밀하지 않음) */
-export const formatAltitude = (ft?: number): DisplayValue | null =>
-  ft === undefined
-    ? null
-    : {
-        main: `${number(Math.round((ft * FT_TO_M) / 10) * 10)} m`,
-        sub: `${number(Math.round(ft))} ft`,
-      };
+/**
+ * 고도. 항공에서 쓰는 ft는 작게, 익숙한 m를 크게. m는 10m 단위로 반올림.
+ * 100ft(30m)보다 낮으면 숫자 대신 "지면 근처" (이착륙 중 마이너스나 0 근처 숫자가 보이지 않게)
+ */
+export const formatAltitude = (ft?: number): DisplayValue | null => {
+  if (ft === undefined) return null;
+  if (isNearGround(ft)) return { main: '지면 근처', sub: `${NEAR_GROUND_FT} ft 미만` };
+  return {
+    main: `${number(Math.round((ft * FT_TO_M) / 10) * 10)} m`,
+    sub: `${number(Math.round(ft))} ft`,
+  };
+};
 
 /** 속도. 노트(kt)를 km/h로 */
 export const formatSpeed = (kt?: number): DisplayValue | null =>

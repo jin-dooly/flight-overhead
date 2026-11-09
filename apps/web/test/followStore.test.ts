@@ -2,6 +2,7 @@ import type { FollowSnapshot } from '@flight/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyFollowSnapshot,
+  markLanded,
   startFollow,
   stopFollow,
   useFollowStore,
@@ -49,10 +50,24 @@ describe('따라가기 스토어', () => {
     expect(s.trail).toEqual([{ lat: 40, lon: 127 }]);
   });
 
+  it('따라가는 동안 가장 높았던 고도를 기억', () => {
+    applyFollowSnapshot({ ...snap(37.51, T0 + 6000), aircraft: { ...snap(37.51, T0 + 6000).aircraft!, altFt: 35000 } });
+    applyFollowSnapshot({ ...snap(37.52, T0 + 12_000), aircraft: { ...snap(37.52, T0 + 12_000).aircraft!, altFt: 20000 } });
+    expect(useFollowStore.getState().maxAltFt).toBe(35000);
+  });
+
   it('지상으로 바뀌면 착륙 시각을 정하고, 그 뒤 메시지는 무시', () => {
     applyFollowSnapshot(snap(37.51, T0 + 6000, true));
     expect(useFollowStore.getState().landedAt).toBe(T0 + 6000);
     applyFollowSnapshot(snap(37.52, T0 + 12_000, false));
     expect(useFollowStore.getState().last?.lat).toBe(37.51);
+  });
+
+  it('지상 신호 없이 착륙 확정하면 마지막 위치 시각이 착륙 시각이 되고, 지상으로 표시(예측 멈춤)', () => {
+    applyFollowSnapshot(snap(37.51, T0 + 6000));
+    markLanded();
+    const s = useFollowStore.getState();
+    expect(s.landedAt).toBe(T0 + 6000);
+    expect(s.last?.onGround).toBe(true);
   });
 });

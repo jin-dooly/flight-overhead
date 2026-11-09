@@ -1,22 +1,25 @@
 import 'leaflet/dist/leaflet.css';
 import '../components/mapUi/mapUi.css';
 import type { Map as LeafletMap } from 'leaflet';
-import { useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import { FollowButton } from '../components/follow/FollowButton';
 import { FollowOverlay } from '../components/follow/FollowOverlay';
 import { AircraftLayer } from '../components/map/AircraftLayer';
-import { FollowMapMode, FollowTrail } from '../components/map/FollowMapMode';
-import { LocationSync, ZoomLimit } from '../components/map/MapViewSync';
+import { FollowMapMode, FollowTrail, type TailUpdater } from '../components/map/FollowMapMode';
+import { LocationSync } from '../components/map/MapViewSync';
 import { MyLocationLayer } from '../components/map/MyLocationLayer';
 import { AircraftSheet } from '../components/mapUi/AircraftSheet';
+import { DraggableBottom } from '../components/mapUi/DraggableBottom';
+import { LocationPendingOverlay } from '../components/mapUi/LocationPendingOverlay';
 import { Attribution, MapControls } from '../components/mapUi/MapControls';
 import { StatusBanner } from '../components/mapUi/StatusBanner';
 import { TopBar } from '../components/mapUi/TopBar';
 import { MAX_VIEW_RADIUS_KM } from '../config';
+import { FOLLOW_LOST_MS } from '../lib/follow';
 import { useDataStatus, useNearby } from '../hooks/useMapData';
 import { useMediaQuery } from '../hooks/useMediaQuery';
-import { boundsAround } from '../lib/geo/distance';
+import { boundsAround, type LatLon } from '../lib/geo/distance';
 import { visibleCenter } from '../components/map/visibleCenter';
 import { useFlightsStore } from '../store/flights';
 import { stopFollow, useFollowStore } from '../store/follow';
@@ -41,6 +44,8 @@ export const MapPage = ({
   // MapContainer의 center는 처음 한 번만 쓰임. 이후 이동은 LocationSync가 맡음
   const initialCenter = useLocationStore.getState();
   const mapRef = useRef<LeafletMap | null>(null);
+  // 따라가기 예측 꼬리를 매 프레임 비행기까지 잇는 함수 (FollowTrail이 채우고 AircraftLayer가 부름)
+  const tailRef = useRef<TailUpdater | null>(null);
   const connection = useFlightsStore((s) => s.connection);
   const nearby = useNearby();
   const isDesktop = useMediaQuery('(min-width: 768px)');
@@ -48,6 +53,8 @@ export const MapPage = ({
   const followLast = useFollowStore((s) => s.last);
   const following = followHex !== null;
   const followed = useMemo(() => (followLast ? [followLast] : []), [followLast]);
+
+  const onFollowFrame = useCallback((pos: LatLon) => tailRef.current?.(pos), []);
 
   // 따라가기를 끝내면 지도를 원래 줌으로 내 위치에 되돌림
   const onExitFollow = () => {
@@ -111,17 +118,18 @@ export const MapPage = ({
           // 따라가는 동안에는 그 비행기 하나만 그리고, 매 프레임 지도 중심을 그 비행기에 맞춤
           <>
             <FollowMapMode />
-            <FollowTrail />
+            <FollowTrail tailRef={tailRef} />
             <AircraftLayer
               aircraft={followed}
               onSelect={noop}
               highlightHex={followHex}
               followHex={followHex}
+              onFollowFrame={onFollowFrame}
+              maxPredictMs={FOLLOW_LOST_MS}
             />
           </>
         ) : (
           <>
-            <ZoomLimit />
             <AircraftLayer
               aircraft={shown}
               onSelect={selectAircraft}
@@ -145,15 +153,19 @@ export const MapPage = ({
           )}
           {isDesktop && (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
         </div>
-        <div className="map-bottom">
+        {/* 폰에서는 카드를 끌어서 접을 수 있음. 데스크톱은 카드가 왼쪽 패널이라 버튼 줄만 */}
+        <DraggableBottom>
           <div className="map-bottom-row">
             <Attribution />
             <MapControls mapRef={mapRef} zoom={MAP_ZOOM} />
           </div>
           {!isDesktop &&
             (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
-        </div>
+        </DraggableBottom>
       </div>
+
+      {/* 처음 위치를 기다리는 동안 지도와 위 UI를 모두 덮음 */}
+      <LocationPendingOverlay />
     </div>
   );
 };

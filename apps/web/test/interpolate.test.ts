@@ -5,7 +5,13 @@ import {
   applyCorrection,
   CONVERGE_MS,
   MAX_PREDICT_MS,
+  LOW_ALTITUDE_PREDICT_MS,
+  NEAR_GROUND_PREDICT_MS,
+  MAX_TURN_S,
+  moveKm,
   predictPosition,
+  SOFT_STOP_MS,
+  softElapsed,
   startCorrection,
 } from '../src/lib/geo/interpolate';
 
@@ -62,10 +68,58 @@ describe('predictPosition', () => {
     });
   });
 
-  it(`${MAX_PREDICT_MS / 1000}초가 지나면 더 나아가지 않음`, () => {
+  it(`${MAX_PREDICT_MS / 1000}초 뒤에는 서서히 멈추고, 상한 + 2초 거리보다 더 가지 않음`, () => {
     const atLimit = predictPosition(aircraft(), T0 + MAX_PREDICT_MS);
     const later = predictPosition(aircraft(), T0 + MAX_PREDICT_MS * 3);
-    expect(later).toEqual(atLimit);
+    const travelled = distanceKm(atLimit, later);
+    expect(travelled).toBeGreaterThan(0);
+    expect(travelled).toBeLessThanOrEqual(0.1852 * (SOFT_STOP_MS / 1000) + 1e-9); // 360kt = 초당 0.1852km
+  });
+
+  it('예측 상한을 따로 주면 그 시간까지 예측함 (따라가기는 3분)', () => {
+    const at60 = predictPosition(aircraft(), T0 + 60_000, 180_000);
+    const at30 = predictPosition(aircraft(), T0 + 30_000, 180_000);
+    expect(at60.lat).toBeGreaterThan(at30.lat);
+    // 지도 기본값(30초)은 60초 뒤에도 30초 + 2초 거리 안
+    expect(distanceKm(predictPosition(aircraft(), T0 + 60_000), predictPosition(aircraft(), T0 + MAX_PREDICT_MS))).toBeLessThanOrEqual(0.371);
+  });
+
+  it('착륙한 비행기(onGround)는 따라가기 예측 시간이 길어도 움직이지 않음', () => {
+    const landed = { ...aircraft(), onGround: true };
+    expect(predictPosition(landed, T0 + 60_000, 180_000)).toEqual({ lat: 37.5, lon: 127 });
+  });
+
+  it('지면 근처(100ft 미만)에서는 3초까지만 예측 (활주 중 감속을 모르니 오래 가면 지나침)', () => {
+    const rolling = aircraft({ altFt: 40 });
+    expect(
+      distanceKm(predictPosition(rolling, T0 + 30_000), predictPosition(rolling, T0 + NEAR_GROUND_PREDICT_MS))
+    ).toBeLessThanOrEqual(0.371);
+    expect(predictPosition(aircraft({ altFt: 5000 }), T0 + 30_000).lat).toBeGreaterThan(
+      predictPosition(rolling, T0 + 30_000).lat
+    );
+  });
+
+  it('3000ft 아래(접근 중)에서는 따라가기여도 20초 근처에서 멈춤', () => {
+    const approach = aircraft({ altFt: 1500 });
+    expect(
+      distanceKm(
+        predictPosition(approach, T0 + 120_000, 180_000),
+        predictPosition(approach, T0 + LOW_ALTITUDE_PREDICT_MS, 180_000)
+      )
+    ).toBeLessThanOrEqual(0.371);
+    // 다음 조회(약 12초 뒤)가 올 때까지는 멈추지 않고 계속 감
+    const at12 = predictPosition(approach, T0 + 12_000, 180_000);
+    const at11 = predictPosition(approach, T0 + 11_000, 180_000);
+    expect(distanceKm(at11, at12)).toBeCloseTo(0.1852, 3);
+  });
+
+  it('상한에서 갑자기 서지 않고 속도가 이어지다 줄어듦', () => {
+    expect(softElapsed(10_000, 10_000)).toBe(10_000);
+    // 상한 직후 0.1초는 거의 0.1초만큼 감 (속도가 이어짐)
+    expect(softElapsed(10_100, 10_000) - 10_000).toBeGreaterThan(95);
+    // 오래 지나도 상한 + 2초를 넘지 않음
+    expect(softElapsed(100_000, 10_000)).toBeLessThanOrEqual(10_000 + SOFT_STOP_MS);
+    expect(softElapsed(-5, 10_000)).toBe(0);
   });
 
   it('seenAt이 지금보다 미래(시계 오차)면 뒤로 가지 않고 그대로', () => {
@@ -82,6 +136,42 @@ describe('predictPosition', () => {
     );
     expect(p.lon).toBeLessThan(-179.9);
     expect(p.lon).toBeGreaterThanOrEqual(-180);
+  });
+});
+
+describe('선회 예측 (moveKm)', () => {
+  it('선회율이 없거나 아주 작으면 직선과 같음', () => {
+    const straight = moveKm(360, 45, undefined, 10);
+    expect(moveKm(360, 45, 0.05, 10).north).toBeCloseTo(straight.north, 9);
+    expect(straight.north).toBeCloseTo(1.852 * Math.cos(Math.PI / 4), 6);
+  });
+
+  it('북쪽으로 가다 초당 3도 오른쪽 선회 30초면 동쪽을 향하고, 반지름 r인 원의 1/4을 돎', () => {
+    const v = 0.1852; // 360kt = 초당 0.1852km
+    const r = v / ((3 * Math.PI) / 180); // 약 3.537km
+    const m = moveKm(360, 0, 3, 30);
+    expect(m.north).toBeCloseTo(r, 6);
+    expect(m.east).toBeCloseTo(r, 6);
+  });
+
+  it('왼쪽 선회(음수)는 서쪽으로 휨', () => {
+    expect(moveKm(360, 0, -3, 30).east).toBeLessThan(0);
+  });
+
+  it(`선회는 ${MAX_TURN_S}초까지만 이어지고, 그 뒤는 그 방향으로 직진`, () => {
+    const at30 = moveKm(360, 0, 3, 30);
+    const at40 = moveKm(360, 0, 3, 40);
+    expect(at40.north).toBeCloseTo(at30.north, 6); // 30초 뒤에는 동쪽(90도)으로 직진
+    expect(at40.east - at30.east).toBeCloseTo(1.852, 6);
+  });
+
+  it('선회 중인 비행기는 직선 예측보다 실제 원호에 가까운 곳으로 감', () => {
+    const turning = { hex: 'abc123', lat: 37.5, lon: 127, speedKt: 180, trackDeg: 0, trackRateDegS: 3, seenAt: T0 };
+    const curved = predictPosition(turning, T0 + 12_000);
+    const straight = predictPosition({ ...turning, trackRateDegS: undefined }, T0 + 12_000);
+    // 12초, 초당 3도면 36도 돌아서 오른쪽(동쪽)으로 휨. 직선 예측과 수백 m 차이
+    expect(curved.lon).toBeGreaterThan(straight.lon);
+    expect(distanceKm(curved, straight)).toBeGreaterThan(0.3);
   });
 });
 
