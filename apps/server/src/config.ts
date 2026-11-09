@@ -24,7 +24,9 @@ const positiveNumber = (value: string | undefined, fallback: number): number => 
 export const loadConfig = (env: NodeJS.ProcessEnv = process.env): Config => ({
   port: positiveNumber(env.PORT, 4000),
   pollIntervalMs: positiveNumber(env.POLL_INTERVAL_MS, 5000),
-  radiusNm: positiveNumber(env.RADIUS_NM, 17),
+  // 21해리(약 39km): 내 위치는 격자 중심에서 최대 약 7km 떨어질 수 있어서, 반경 30km로 넓혀도 한쪽 가장자리가
+  // 비지 않게 30 + 7 + 여유. 지역 통째 조회 결과에서 고르는 반경이라 늘려도 외부 요청은 늘지 않음 (2026-11-09 사용자 결정)
+  radiusNm: positiveNumber(env.RADIUS_NM, 21),
   userAgent: env.USER_AGENT?.trim() || 'flight-overhead/0.1',
   maxFollows: positiveNumber(env.MAX_FOLLOWS, 20),
   // 따라가기 조회 간격: 10초로 늘렸다가 선회 중 예측 오차가 4배쯤 커져서(10초마다 화면이 옆으로 끌림) 5초로 되돌림

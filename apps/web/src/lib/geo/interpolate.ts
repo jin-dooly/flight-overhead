@@ -93,6 +93,29 @@ export const moveKm = (
   };
 };
 
+/**
+ * 지금 예상되는 진행 방향(0~360). 선회율이 있으면 위치 예측과 같은 시간만큼 돌린 방향.
+ * 위치는 원호로 예측하는데 아이콘만 마지막 방향을 가리키면 옆으로 미끄러지는 것처럼 보여서 같이 돌림
+ */
+export const predictTrack = (
+  aircraft: Aircraft & { onGround?: boolean },
+  atMs: number,
+  maxPredictMs: number = MAX_PREDICT_MS
+): number | undefined => {
+  const { trackDeg, trackRateDegS, onGround, altFt, seenAt } = aircraft;
+  if (trackDeg === undefined) return undefined;
+  const rate = trackRateDegS ?? 0;
+  if (onGround || Math.abs(rate) < MIN_TURN_RATE) return trackDeg;
+  const limitMs = isNearGround(altFt)
+    ? Math.min(maxPredictMs, NEAR_GROUND_PREDICT_MS)
+    : isLowAltitude(altFt)
+      ? Math.min(maxPredictMs, LOW_ALTITUDE_PREDICT_MS)
+      : maxPredictMs;
+  const turnS = Math.min(softElapsed(atMs - seenAt, limitMs) / 1000, MAX_TURN_S);
+  const clamped = Math.max(-MAX_TURN_RATE, Math.min(MAX_TURN_RATE, rate));
+  return (((trackDeg + clamped * turnS) % 360) + 360) % 360;
+};
+
 export const predictPosition = (
   aircraft: Aircraft & { onGround?: boolean },
   atMs: number,
