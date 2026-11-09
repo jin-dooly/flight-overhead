@@ -16,6 +16,7 @@ export const useFollowSubscription = () => {
   useEffect(() => {
     if (!topic) return;
     const client = getMqttClient();
+    if (!client) return; // 연결을 만들지 못함 (lib/mqtt.ts)
     client.subscribe(topic, (err, granted) => {
       // 서버 전체 따라가기 수가 상한이면 SUBACK 128로 거절됨 (mqtt.js는 이를 에러로 넘기기도 함)
       if (err || granted?.[0]?.qos === 128) markFollowRejected();
