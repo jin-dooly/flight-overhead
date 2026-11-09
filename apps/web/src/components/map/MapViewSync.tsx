@@ -1,7 +1,5 @@
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
-import { MAX_VIEW_RADIUS_KM } from '../../config';
-import { boundsAround } from '../../lib/geo/distance';
 import { useLocationStore } from '../../store/location';
 import { visibleCenter } from './visibleCenter';
 
@@ -21,36 +19,32 @@ export const LocationSync = ({ paused = false }: { paused?: boolean }) => {
     // 따라가는 동안에는 내 위치가 바뀌어도 지도를 옮기지 않음 (지도 중심은 비행기가 차지)
     if (status === 'pending' || paused) return;
     const zoom = map.getZoom();
-    map.flyTo(visibleCenter(map, lat, lon, zoom), zoom, { duration: 2 });
-  }, [map, lat, lon, status, paused]);
+    const target = visibleCenter(map, lat, lon, zoom);
 
-  return null;
-};
-
-/**
- * 반경 30km(서버가 받아 오는 범위)가 화면에 다 들어갈 때까지만 축소할 수 있게 최소 줌을 정함.
- * 그보다 더 축소하면 데이터가 없는 빈 지도만 넓어지기 때문 (기획서 결정 기록 2026-11-08).
- * 화면 크기에 따라 필요한 줌이 달라서(폰 세로 약 9, 데스크톱 약 10) 고정값 대신 계산하고,
- * 창 크기가 바뀌면 다시 계산함
- */
-export const ZoomLimit = () => {
-  const map = useMap();
-  const lat = useLocationStore((s) => s.lat);
-  const lon = useLocationStore((s) => s.lon);
-
-  useEffect(() => {
-    const update = () => {
-      const zoom = map.getBoundsZoom(
-        boundsAround({ lat, lon }, MAX_VIEW_RADIUS_KM)
-      );
-      map.setMinZoom(zoom);
+    // 안전장치 (사용자 제보 2026-11-09: 크롬에서 내 위치를 받았는데 지도가 기본 위치에 남음).
+    // flyTo 애니메이션이 다른 지도 이동에 밀려 중간에 멈추면 목표에 못 간 채로 끝날 수 있음.
+    // 애니메이션이 끝나면(moveend) 실제 중심을 확인해서, 목표에서 벗어나 있으면 바로 맞춤.
+    // 그 사이 사용자가 지도를 끌었으면 사용자의 이동을 존중해서 그대로 둠
+    let userMoved = false;
+    const onDragStart = () => {
+      userMoved = true;
     };
-    update();
-    map.on('resize', update);
+    const ensureArrived = () => {
+      if (userMoved) return;
+      if (map.getCenter().distanceTo(target) > 100) map.setView(target, zoom, { animate: false });
+    };
+    map.on('dragstart', onDragStart);
+    map.flyTo(target, zoom, { duration: 2 });
+    map.once('moveend', ensureArrived);
+    // moveend가 오지 않는 경우(애니메이션이 아예 시작되지 않음)를 위해 애니메이션 시간 뒤에도 한 번 확인
+    const timer = setTimeout(ensureArrived, 2500);
+
     return () => {
-      map.off('resize', update);
+      clearTimeout(timer);
+      map.off('dragstart', onDragStart);
+      map.off('moveend', ensureArrived);
     };
-  }, [map, lat, lon]);
+  }, [map, lat, lon, status, paused]);
 
   return null;
 };

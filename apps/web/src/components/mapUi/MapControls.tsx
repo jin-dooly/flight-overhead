@@ -40,6 +40,14 @@ export const Attribution = () => (
     <a href="https://www.openstreetmap.org/copyright" target="_blank" rel="noreferrer">
       OpenStreetMap
     </a>{' '}
-    · 데이터 adsb.lol / adsb.fi
+    {/* adsb.fi는 출처 표기와 홈페이지 링크가 이용 조건(공식 README) */}
+    · 데이터{' '}
+    <a href="https://adsb.fi" target="_blank" rel="noreferrer">
+      adsb.fi
+    </a>{' '}
+    /{' '}
+    <a href="https://adsb.lol" target="_blank" rel="noreferrer">
+      adsb.lol
+    </a>
   </div>
 );
