@@ -1,6 +1,9 @@
 import { useEffect, useMemo, useRef, useState, type PointerEvent } from 'react';
+import { useDeviceOrientation } from '../../hooks/useDeviceOrientation';
 import { useDataStatus, useNearby } from '../../hooks/useMapData';
+import { useMediaQuery } from '../../hooks/useMediaQuery';
 import { compassName, formatAgo, formatAltitude, formatDistanceKm, formatSpeed } from '../../lib/format';
+import { detectBrowserEnv, type BrowserEnv } from '../../lib/device';
 import { distanceKm } from '../../lib/geo/distance';
 import { predictPosition } from '../../lib/geo/interpolate';
 import { angleDiff, pickLocked, projectToScreen, skyDirection } from '../../lib/sky';
@@ -15,21 +18,38 @@ const MAX_PITCH = 85;
 
 const clamp = (v: number, min: number, max: number) => Math.min(max, Math.max(min, v));
 
+/** 센서를 못 쓰고 끌어서 둘러보는 이유 (안내 띠 문구) */
+export type DragReason = 'denied' | 'unsupported' | 'no-data' | 'preview';
+
+/** 화면을 다시 그릴 만큼 방향이 바뀌었는지 (센서 미세 떨림으로 매 프레임 다시 그리지 않게) */
+const LOOK_EPSILON_DEG = 0.05;
+
 /**
  * 하늘 화면 (목업 SkyMain).
  * - 위: 지금 향한 방향(북동 36°)과 나침반 띠
  * - 가운데: 올려다보는 각도 눈금, 지평선, 조준 원, 비행기
  * - 아래: 조준한 비행기 카드
  *
- * 지금은 UI 단계라 방향(heading)과 각도(pitch)를 폰 센서 대신 화면을 끌어서 바꿈.
- * 센서를 연결할 때는 이 두 값만 deviceorientation 이벤트에서 받도록 바꾸면 됨
+ * 방향(heading)과 각도(pitch)를 어디서 받는지는 mode로 정함
+ * - sensor: 폰 방향 센서. 센서 값은 ref로 받고 매 프레임 읽어서 화면에 반영
+ * - drag: 화면을 끌어서 둘러보기 (센서 권한 거부, 센서 없음, PC 미리 보기)
  */
 export const SkyView = ({
+  mode,
+  dragReason,
   onBack,
   onShowOnMap,
+  onSensorFail,
+  onRetrySensor,
 }: {
+  mode: 'sensor' | 'drag';
+  dragReason?: DragReason;
   onBack: () => void;
   onShowOnMap: (hex: string) => void;
+  /** 센서 권한은 받았는데 방향 값이 안 올 때 */
+  onSensorFail: () => void;
+  /** 끌어서 둘러보기 중 "다시 시도" (클릭 안에서 권한을 다시 요청) */
+  onRetrySensor: () => void;
 }) => {
   const rootRef = useRef<HTMLDivElement>(null);
   const [size, setSize] = useState({ width: 390, height: 844 });
@@ -58,6 +78,33 @@ export const SkyView = ({
       : { heading: 0, pitch: 20 };
   });
 
+  // 센서 모드: 센서 값은 ref에 계속 쌓이고, 매 프레임 읽어서 눈에 띄게 바뀌었을 때만 화면을 다시 그림
+  const sensor = useDeviceOrientation(mode === 'sensor');
+  useEffect(() => {
+    if (mode !== 'sensor') return;
+    let frame = 0;
+    const tick = () => {
+      const next = sensor.lookRef.current;
+      if (next) {
+        setLook((l) =>
+          Math.abs(angleDiff(next.heading, l.heading)) < LOOK_EPSILON_DEG &&
+          Math.abs(next.pitch - l.pitch) < LOOK_EPSILON_DEG
+            ? l
+            : next
+        );
+      }
+      frame = requestAnimationFrame(tick);
+    };
+    frame = requestAnimationFrame(tick);
+    return () => cancelAnimationFrame(frame);
+  }, [mode, sensor.lookRef]);
+  useEffect(() => {
+    if (mode === 'sensor' && sensor.status === 'no-data') onSensorFail();
+  }, [mode, sensor.status, onSensorFail]);
+
+  // 가로로 돌리면 "세로로 들어 주세요" (사용자 결정 2026-11-09: 가로 보정 대신 안내)
+  const landscape = useMediaQuery('(orientation: landscape)');
+
   const pxPerDeg = size.width / FIELD_OF_VIEW_DEG;
   const centerY = Math.round(size.height * 0.45);
   const view = { headingDeg: look.heading, pitchDeg: look.pitch, width: size.width, centerY, pxPerDeg };
@@ -78,7 +125,8 @@ export const SkyView = ({
   // 끌어서 둘러보기: 왼쪽으로 끌면 오른쪽(동쪽)을 보게 되고, 아래로 끌면 위를 보게 됨
   const drag = useRef<{ x: number; y: number } | null>(null);
   const onPointerDown = (e: PointerEvent) => {
-    if ((e.target as HTMLElement).closest('.sky-card, .sky-header')) return;
+    if (mode !== 'drag') return;
+    if ((e.target as HTMLElement).closest('.sky-card, .sky-header, .sky-notice')) return;
     drag.current = { x: e.clientX, y: e.clientY };
     (e.currentTarget as HTMLElement).setPointerCapture(e.pointerId);
   };
@@ -154,7 +202,9 @@ export const SkyView = ({
       })}
 
       <p className="sky-tip" style={{ top: horizonY + 35 }}>
-        화면을 끌어서 둘러보세요 · 센서를 연결하면 폰 방향을 따라가요
+        {mode === 'sensor'
+          ? '대략적인 방향이에요. 폰을 천천히 돌려 보세요'
+          : '화면을 끌어서 둘러보세요'}
       </p>
 
       <header className="sky-header">
@@ -173,6 +223,18 @@ export const SkyView = ({
         </div>
         <Compass heading={look.heading} width={size.width} pxPerDeg={pxPerDeg} />
       </header>
+
+      {mode === 'drag' && dragReason && dragReason !== 'preview' && (
+        <DragNotice reason={dragReason} onRetry={onRetrySensor} />
+      )}
+
+      {mode === 'sensor' && landscape && (
+        <div className="sky-landscape" role="status">
+          <RotateIcon />
+          <strong>폰을 세로로 들어 주세요</strong>
+          <p>하늘 모드는 세로 화면에서 방향을 맞춰요</p>
+        </div>
+      )}
 
       <section aria-label="조준한 비행기" className="sky-card">
         {locked ? (
@@ -287,5 +349,59 @@ const PlaneSvg = ({ size }: { size: number }) => (
       d="M12 2c.8 0 1.3.7 1.3 1.6V9l7.7 4.6v2l-7.7-2.3v4.9l2.2 1.7V21L12 20.2 8.5 21v-1.1l2.2-1.7v-4.9L3 15.6v-2L10.7 9V3.6C10.7 2.7 11.2 2 12 2z"
       fill="currentColor"
     />
+  </svg>
+);
+
+/** 센서 권한을 다시 켜는 방법. 기기와 브라우저마다 달라서 지금 환경에 맞는 문장을 고름 */
+const DENIED_HOW: Record<BrowserEnv, string> = {
+  kakao: '카카오톡 ⋯ 메뉴의 "다른 브라우저로 열기"로 Safari나 Chrome에서 열어 주세요.',
+  inapp: '⋯ 메뉴의 "브라우저에서 열기"로 Safari나 Chrome에서 열어 주세요.',
+  'ios-safari': 'Safari를 완전히 닫았다가 다시 열고, 다시 시도를 눌러 허용해 주세요.',
+  'ios-chrome': 'Chrome을 완전히 닫았다가 다시 열고, 다시 시도를 눌러 허용해 주세요.',
+  android: '주소창 왼쪽 아이콘 → 권한(또는 사이트 설정) → 동작 센서를 허용한 뒤 다시 시도를 눌러 주세요.',
+  desktop: '폰에서 열면 폰 방향을 따라가요.',
+};
+
+/** 센서를 못 쓸 때 위쪽 안내 (사용자 결정 2026-11-09: 거부하면 끌어서 둘러보기로) */
+const noticeText = (
+  reason: Exclude<DragReason, 'preview'>,
+  env: BrowserEnv
+): { title: string; desc: string } => {
+  if (reason === 'denied') {
+    return { title: '센서 권한이 없어서 화면을 끌어서 둘러봐요', desc: DENIED_HOW[env] };
+  }
+  if (reason === 'unsupported') {
+    return {
+      title: '이 브라우저는 방향 센서를 지원하지 않아요',
+      desc: '화면을 끌어서 둘러볼 수 있어요. Safari나 Chrome에서 열면 폰 방향을 따라가요.',
+    };
+  }
+  return {
+    title: '나침반 값을 받지 못해서 화면을 끌어서 둘러봐요',
+    desc: '폰을 8자 모양으로 몇 번 돌리면 나침반이 맞춰질 수 있어요. 그 뒤 다시 시도를 눌러 주세요.',
+  };
+};
+
+const DragNotice = ({ reason, onRetry }: { reason: Exclude<DragReason, 'preview'>; onRetry: () => void }) => {
+  const text = noticeText(reason, detectBrowserEnv(navigator.userAgent, navigator.maxTouchPoints));
+  return (
+  <div className="sky-notice" role="status">
+    <div>
+      <strong>{text.title}</strong>
+      <p>{text.desc}</p>
+    </div>
+    {reason !== 'unsupported' && (
+      <button type="button" onClick={onRetry}>
+        다시 시도
+      </button>
+    )}
+  </div>
+  );
+};
+
+const RotateIcon = () => (
+  <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="#9DB8FF" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="7" y="2" width="10" height="20" rx="2.5" />
+    <path d="M11 18h2" />
   </svg>
 );
