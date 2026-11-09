@@ -3,7 +3,7 @@ import adsbFiSample from './fixtures/adsbFi.json';
 import adsbLolSample from './fixtures/adsbLol.json';
 import { createAdsbFiSource } from '../src/sources/adsbFi';
 import { createAdsbLolSource } from '../src/sources/adsbLol';
-import { normalizeAircraft } from '../src/sources/normalize';
+import { normalizeAircraft, normalizeResponse, responseTime } from '../src/sources/normalize';
 
 const NOW = 1_762_534_800_000;
 
@@ -67,6 +67,24 @@ describe('normalizeAircraft', () => {
     expect(normalizeAircraft({ hex: 'a', lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft({ lat: 1, lon: 2 }, NOW)).toBeNull();
     expect(normalizeAircraft(null, NOW)).toBeNull();
+  });
+});
+
+describe('응답 시각 기준 위치 시각', () => {
+  it('seen_pos는 받은 시각이 아니라 응답 시각(now)에서 뺌. ms와 초 단위 둘 다', () => {
+    const plane = { hex: 'a', lat: 1, lon: 2, seen_pos: 1.5 };
+    // adsb.lol: ms, 응답이 2초 전에 만들어짐
+    expect(normalizeResponse({ now: NOW - 2000, ac: [plane] }, 'ac', NOW)[0].seenAt).toBe(NOW - 3500);
+    // adsb.fi: 초 단위
+    expect(normalizeResponse({ now: (NOW - 2000) / 1000, aircraft: [plane] }, 'aircraft', NOW)[0].seenAt).toBe(
+      NOW - 3500
+    );
+  });
+
+  it('응답 시각이 없거나 1분 넘게 어긋나면 받은 시각', () => {
+    expect(responseTime({}, NOW)).toBe(NOW);
+    expect(responseTime({ now: NOW - 120_000 }, NOW)).toBe(NOW);
+    expect(responseTime({ now: NOW + 30_000 }, NOW)).toBe(NOW + 30_000);
   });
 });
 

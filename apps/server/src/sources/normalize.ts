@@ -44,6 +44,27 @@ export const normalizeAircraft = (
   return aircraft;
 };
 
+/** 응답 시각이 우리 서버 시계와 이보다 크게 다르면, 응답 시각을 믿지 않고 받은 시각을 씀 */
+const MAX_CLOCK_SKEW_MS = 60_000;
+
+/**
+ * 위치 시각(seenAt)을 계산할 기준 시각.
+ * `seen_pos`는 "응답을 만든 시각(now)으로부터 몇 초 전"이라서, 받은 시각이 아니라 응답 시각에서 빼야 맞음.
+ * adsb.fi 응답은 만들어진 지 약 2초 뒤에 도착해서(2026-11-09 측정), 받은 시각에서 빼면
+ * 위치가 2초 신선한 것으로 잘못 계산되고 예측이 그만큼 뒤처졌음.
+ * - adsb.lol은 ms, adsb.fi는 초 단위(정수)로 옴
+ * - 응답 시각이 없거나 우리 시계와 1분 넘게 다르면(어느 쪽 시계가 틀림) 받은 시각을 씀
+ */
+export const responseTime = (body: unknown, receivedAt: number): number => {
+  const raw =
+    typeof body === 'object' && body !== null
+      ? num((body as Record<string, unknown>).now)
+      : undefined;
+  if (raw === undefined) return receivedAt;
+  const ms = raw < 1e12 ? raw * 1000 : raw;
+  return Math.abs(ms - receivedAt) > MAX_CLOCK_SKEW_MS ? receivedAt : ms;
+};
+
 /** 응답 본문에서 `listKey` 배열을 꺼내 정규화. 배열이 없으면 형식 오류로 보고 throw */
 export const normalizeResponse = (
   body: unknown,
@@ -57,8 +78,9 @@ export const normalizeResponse = (
   if (!Array.isArray(list)) {
     throw new Error(`응답에 "${listKey}" 배열이 없음`);
   }
+  const base = responseTime(body, now);
   return list
-    .map((raw) => normalizeAircraft(raw, now))
+    .map((raw) => normalizeAircraft(raw, base))
     .filter((a): a is Aircraft => a !== null);
 };
 
@@ -95,8 +117,9 @@ export const normalizeHexResponse = (
     typeof body === 'object' && body !== null ? (body as Record<string, unknown>) : {};
   const list = [record.ac, record.aircraft].find(Array.isArray);
   if (!list) throw new Error('응답에 "ac"나 "aircraft" 배열이 없음');
+  const base = responseTime(body, now);
   for (const raw of list) {
-    const followed = normalizeFollowed(raw, now);
+    const followed = normalizeFollowed(raw, base);
     if (followed && followed.hex.toLowerCase() === hex) return followed;
   }
   return null;
