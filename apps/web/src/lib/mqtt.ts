@@ -18,16 +18,24 @@ let client: MqttClient | null = null;
  * 앱 전체에서 MQTT 연결은 하나만 씀. 처음 부를 때 연결하고, 이후에는 같은 연결을 돌려줌.
  * 지도 모드와 하늘 모드를 오가도 연결이 끊겼다 다시 붙지 않게 컴포넌트 밖에 둠.
  */
-export const getMqttClient = (): MqttClient => {
+export const getMqttClient = (): MqttClient | null => {
   if (client) return client;
 
-  client = mqtt.connect(MQTT_URL, {
-    // 끊기면 2초마다 다시 붙음. 다시 붙으면 mqtt.js가 구독 중이던 토픽을 알아서 다시 구독함(resubscribe 기본값)
-    reconnectPeriod: 2_000,
-    connectTimeout: 10_000,
-    // Render 프록시는 연결이 끊겨도 바로 알려 주지 않아서, 30초마다 핑을 보내 끊김을 빨리 알아챔
-    keepalive: 30,
-  });
+  try {
+    client = mqtt.connect(MQTT_URL, {
+      // 끊기면 2초마다 다시 붙음. 다시 붙으면 mqtt.js가 구독 중이던 토픽을 알아서 다시 구독함(resubscribe 기본값)
+      reconnectPeriod: 2_000,
+      connectTimeout: 10_000,
+      // Render 프록시는 연결이 끊겨도 바로 알려 주지 않아서, 30초마다 핑을 보내 끊김을 빨리 알아챔
+      keepalive: 30,
+    });
+  } catch (err) {
+    // 브라우저가 연결 자체를 막으면(예: HTTPS 페이지에서 ws:// 주소) 여기서 바로 오류가 남.
+    // 잡지 않으면 앱 전체가 멈춰서 지도도 안 뜨므로, 연결만 포기하고 화면은 "연결 중"으로 둠
+    console.error('MQTT 연결을 만들지 못함', err);
+    useFlightsStore.setState({ connection: 'reconnecting' });
+    return null;
+  }
 
   const setConnection = (connection: 'live' | 'reconnecting') =>
     useFlightsStore.setState({ connection });

@@ -22,6 +22,7 @@ export const useGridSubscription = () => {
     // 이전 격자의 비행기가 새 위치에 잠깐 보이지 않게 스냅샷을 비움
     useFlightsStore.setState({ topic, snapshot: null });
     const client = getMqttClient();
+    if (!client) return; // 연결을 만들지 못함 (lib/mqtt.ts)
     client.subscribe(topic);
     return () => {
       client.unsubscribe(topic);
