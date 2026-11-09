@@ -38,6 +38,13 @@ type Entry = {
 };
 
 /**
+ * README의 "보간 전후 비교" 녹화용. 개발 서버에서 주소에 ?nointerp를 붙이면 예측과 수렴 없이
+ * 받은 위치에 바로 찍음(보간을 안 했을 때의 모습). 배포 빌드에서는 import.meta.env.DEV가 false라 동작하지 않음
+ */
+const NO_INTERPOLATION =
+  import.meta.env.DEV && new URLSearchParams(window.location.search).has('nointerp');
+
+/**
  * 비행기 마커를 Leaflet으로 직접 관리함. React 화면에는 아무것도 그리지 않음(return null).
  * - 데이터가 올 때(약 6초마다): 마커 추가/삭제, 수렴 시작
  * - 매 프레임(초당 약 60번): 예측 위치로 마커를 옮김
@@ -157,8 +164,13 @@ export function AircraftLayer({
       if (!zooming) {
         const now = serverNow();
         for (const entry of entries.current.values()) {
-          const predicted = predictPosition(entry.aircraft, now, maxPredictRef.current);
-          const pos = applyCorrection(predicted, entry.correction, now);
+          const pos = NO_INTERPOLATION
+            ? { lat: entry.aircraft.lat, lon: entry.aircraft.lon }
+            : applyCorrection(
+                predictPosition(entry.aircraft, now, maxPredictRef.current),
+                entry.correction,
+                now
+              );
           if (entry.correction && now - entry.correction.startedAt >= CONVERGE_MS) {
             entry.correction = null; // 수렴이 끝났으면 더 계산하지 않음
           }
