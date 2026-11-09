@@ -38,7 +38,60 @@ export const NEAR_GROUND_PREDICT_MS = 3_000;
  * 저고도(3000ft 아래, 이착륙 접근 중)에서는 이 시간까지만 예측함.
  * 착륙 직전에 위치가 끊기면 예전에는 따라가기 예측 시간(3분)만큼 공항을 지나쳐 계속 날아갔음(사용자 제보 2026-11-09)
  */
-export const LOW_ALTITUDE_PREDICT_MS = 10_000;
+export const LOW_ALTITUDE_PREDICT_MS = 20_000;
+// 처음엔 10초였는데, 따라가기는 10초마다 조회하고 위치가 1~2초 늦게 오므로 새 위치가 오기 전에(약 12초)
+// 예측이 먼저 멈춰서, 접근 중인 비행기가 2초쯤 섰다가 튀기를 반복했음(2026-11-09 측정). 조회 한 번을 놓쳐도 버티게 20초
+
+/**
+ * 예측 상한에 닿으면 갑자기 멈추지 않고 이 시간 동안 서서히 느려지며 멈춤.
+ * 상한에서 딱 멈추면 "가다가 뚝 서는" 게 눈에 띄어서, 속도를 이어받아 부드럽게 줄임.
+ * 상한 뒤로는 최대 이 시간만큼의 거리만 더 감
+ */
+export const SOFT_STOP_MS = 2_000;
+
+/** 지난 시간을 예측에 쓸 시간으로 바꿈. 상한까지는 그대로, 그 뒤로는 서서히 멈춤(지수 감속) */
+export const softElapsed = (elapsedMs: number, limitMs: number): number => {
+  const e = Math.max(0, elapsedMs);
+  if (e <= limitMs) return e;
+  return limitMs + SOFT_STOP_MS * (1 - Math.exp(-(e - limitMs) / SOFT_STOP_MS));
+};
+
+/** 선회를 이어서 예측하는 최대 시간(초). 그 뒤로는 그때 방향으로 직진 (계속 돌면 제자리에서 원을 그림) */
+export const MAX_TURN_S = 30;
+/** 이보다 느린 선회는 직진으로 봄 (값 잡음) */
+const MIN_TURN_RATE = 0.1;
+/** 이보다 빠른 선회율은 잘못 온 값으로 보고 여기까지만 씀 (여객기 표준 선회는 초당 3도) */
+const MAX_TURN_RATE = 6;
+
+/**
+ * 지난 시간 동안 북쪽, 동쪽으로 움직인 거리(km).
+ * 선회율이 있으면 원호를 따라, 없으면 직선으로. 방향 0도 = 북쪽, 90도 = 동쪽, 선회율 +는 시계 방향.
+ *
+ * 선회 반영 이유(2026-11-09): 직선 예측은 선회 중에 시간이 길수록 크게 틀려서,
+ * 새 위치가 올 때마다 비행기와 따라가기 화면이 옆으로 끌려갔음(초당 3도, 180kt, 12초면 약 350m)
+ */
+export const moveKm = (
+  speedKt: number,
+  trackDeg: number,
+  trackRateDegS: number | undefined,
+  seconds: number
+): { north: number; east: number } => {
+  const v = (speedKt * KM_PER_NM) / 3600; // km/s
+  const t0 = (trackDeg * Math.PI) / 180;
+  const rate = trackRateDegS ?? 0;
+  if (Math.abs(rate) < MIN_TURN_RATE) {
+    return { north: v * seconds * Math.cos(t0), east: v * seconds * Math.sin(t0) };
+  }
+  // 원호: 방향 θ(t) = θ0 + ωt 를 적분하면 북 = v/ω·(sin θ1 − sin θ0), 동 = v/ω·(cos θ0 − cos θ1)
+  const w = (Math.max(-MAX_TURN_RATE, Math.min(MAX_TURN_RATE, rate)) * Math.PI) / 180;
+  const turnS = Math.min(seconds, MAX_TURN_S);
+  const t1 = t0 + w * turnS;
+  const straightS = seconds - turnS;
+  return {
+    north: (v / w) * (Math.sin(t1) - Math.sin(t0)) + v * straightS * Math.cos(t1),
+    east: (v / w) * (Math.cos(t0) - Math.cos(t1)) + v * straightS * Math.sin(t1),
+  };
+};
 
 export const predictPosition = (
   aircraft: Aircraft & { onGround?: boolean },
@@ -57,15 +110,11 @@ export const predictPosition = (
     : isLowAltitude(altFt)
       ? Math.min(maxPredictMs, LOW_ALTITUDE_PREDICT_MS)
       : maxPredictMs;
-  const elapsedMs = Math.min(Math.max(atMs - seenAt, 0), limitMs);
-  const km = speedKt * KM_PER_NM * (elapsedMs / 3_600_000);
-  const track = (trackDeg * Math.PI) / 180;
-
-  // 방향 0도 = 북쪽, 90도 = 동쪽. 북쪽 성분은 위도, 동쪽 성분은 경도로
-  const dLat = (km * Math.cos(track)) / KM_PER_DEG_LAT;
+  const elapsedMs = softElapsed(atMs - seenAt, limitMs);
+  const { north, east } = moveKm(speedKt, trackDeg, aircraft.trackRateDegS, elapsedMs / 1000);
+  const dLat = north / KM_PER_DEG_LAT;
   // 경도 1도의 길이는 위도가 높을수록 짧아짐(cos(위도)배)
-  const dLon =
-    (km * Math.sin(track)) / (KM_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
+  const dLon = east / (KM_PER_DEG_LAT * Math.cos((lat * Math.PI) / 180));
 
   return { lat: lat + dLat, lon: wrapLon(lon + dLon) };
 };
