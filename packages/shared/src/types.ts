@@ -12,6 +12,8 @@ export type Aircraft = {
   speedKt?: number;
   /** 진행 방향 0~360 */
   trackDeg?: number;
+  /** 선회율(초당 도). +는 오른쪽(시계 방향)으로 도는 중. 선회 중 위치를 곡선으로 예측하는 데 씀 */
+  trackRateDegS?: number;
   /** 위치를 받은 시각(ms) */
   seenAt: number;
 };

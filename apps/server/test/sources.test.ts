@@ -88,6 +88,14 @@ describe('응답 시각 기준 위치 시각', () => {
   });
 });
 
+describe('선회율', () => {
+  it('track_rate가 있으면 trackRateDegS로, 없으면 비움', () => {
+    const base = { hex: 'a', lat: 1, lon: 2, track: 90 };
+    expect(normalizeAircraft({ ...base, track_rate: -0.94 }, NOW)?.trackRateDegS).toBe(-0.94);
+    expect(normalizeAircraft(base, NOW)).not.toHaveProperty('trackRateDegS');
+  });
+});
+
 describe('고도', () => {
   it('기하 고도(GPS)가 있으면 그 값, 없으면 기압 고도', () => {
     const base = { hex: 'a', lat: 1, lon: 2 };

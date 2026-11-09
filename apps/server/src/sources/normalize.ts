@@ -41,6 +41,9 @@ export const normalizeAircraft = (
   if (speedKt !== undefined) aircraft.speedKt = speedKt;
   const trackDeg = num(item.track);
   if (trackDeg !== undefined) aircraft.trackDeg = trackDeg;
+  // 선회율은 일부 기체만 보냄(2026-11-09 확인: 인천 근처 36대 중 17대)
+  const trackRate = num(item.track_rate);
+  if (trackRate !== undefined) aircraft.trackRateDegS = trackRate;
   return aircraft;
 };
 
