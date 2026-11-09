@@ -8,9 +8,11 @@ import {
   CONVERGE_MS,
   MAX_PREDICT_MS,
   predictPosition,
+  predictTrack,
   startCorrection,
   type Correction,
 } from '../../lib/geo/interpolate';
+import { angleDiff } from '../../lib/sky';
 import { serverNow } from '../../store/flights';
 import {
   createAircraftIcon,
@@ -31,6 +33,8 @@ type Entry = {
   shown: LatLon;
   /** 30초 넘게 새 위치를 못 받아 흐리게 보여 주는 중인지. 바뀔 때만 클래스를 바꾸려고 기억함 */
   stale: boolean;
+  /** 아이콘에 지금 적용된 방향. 선회 중에는 매 프레임 바뀌므로, 눈에 띄게 달라질 때만 DOM을 고치려고 기억함 */
+  rotation: number | undefined;
 };
 
 /**
@@ -109,6 +113,7 @@ export function AircraftLayer({
         }
         entry.aircraft = a;
         setRotation(entry.marker, a.trackDeg);
+        entry.rotation = a.trackDeg;
         continue;
       }
 
@@ -125,6 +130,7 @@ export function AircraftLayer({
         correction: null,
         shown: predicted,
         stale: false,
+        rotation: a.trackDeg,
       });
     }
 
@@ -158,6 +164,15 @@ export function AircraftLayer({
           }
           entry.marker.setLatLng([pos.lat, pos.lon]);
           entry.shown = pos;
+          // 선회 중이면 아이콘도 예측 방향으로 같이 돌림. 0.5도 넘게 바뀔 때만 고쳐서 DOM 작업을 줄임
+          const track = predictTrack(entry.aircraft, now, maxPredictRef.current);
+          if (
+            track !== undefined &&
+            (entry.rotation === undefined || Math.abs(angleDiff(track, entry.rotation)) > 0.5)
+          ) {
+            setRotation(entry.marker, track);
+            entry.rotation = track;
+          }
           // 따라가기: 마커를 옮긴 같은 프레임에 지도도 옮겨서, 비행기가 화면 가운데에 고정돼 보이게 함
           if (entry.aircraft.hex === followRef.current) {
             placeMarkerExactly(map, entry.marker, pos.lat, pos.lon);

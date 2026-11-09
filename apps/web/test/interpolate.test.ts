@@ -10,6 +10,7 @@ import {
   MAX_TURN_S,
   moveKm,
   predictPosition,
+  predictTrack,
   SOFT_STOP_MS,
   softElapsed,
   startCorrection,
@@ -172,6 +173,24 @@ describe('선회 예측 (moveKm)', () => {
     // 12초, 초당 3도면 36도 돌아서 오른쪽(동쪽)으로 휨. 직선 예측과 수백 m 차이
     expect(curved.lon).toBeGreaterThan(straight.lon);
     expect(distanceKm(curved, straight)).toBeGreaterThan(0.3);
+  });
+});
+
+describe('predictTrack', () => {
+  const base = { hex: 'abc123', lat: 37.5, lon: 127, speedKt: 180, trackDeg: 350, seenAt: T0 };
+
+  it('선회율만큼 돌린 방향 (350도에서 초당 3도로 10초면 20도)', () => {
+    expect(predictTrack({ ...base, trackRateDegS: 3 }, T0 + 10_000)).toBeCloseTo(20, 6);
+  });
+
+  it('선회율이 없거나 착륙했으면 마지막 방향 그대로', () => {
+    expect(predictTrack(base, T0 + 10_000)).toBe(350);
+    expect(predictTrack({ ...base, trackRateDegS: 3, onGround: true }, T0 + 10_000)).toBe(350);
+  });
+
+  it(`${MAX_TURN_S}초 넘게는 돌리지 않음`, () => {
+    expect(predictTrack({ ...base, trackDeg: 0, trackRateDegS: 3 }, T0 + 25_000, 180_000)).toBeCloseTo(75, 6);
+    expect(predictTrack({ ...base, trackDeg: 0, trackRateDegS: 3 }, T0 + 60_000, 180_000)).toBeCloseTo(90, 6);
   });
 });
 
