@@ -5,6 +5,7 @@ import {
   applyCorrection,
   CONVERGE_MS,
   MAX_PREDICT_MS,
+  LOW_ALTITUDE_PREDICT_MS,
   NEAR_GROUND_PREDICT_MS,
   predictPosition,
   startCorrection,
@@ -88,6 +89,13 @@ describe('predictPosition', () => {
     );
     expect(predictPosition(aircraft({ altFt: 5000 }), T0 + 30_000).lat).toBeGreaterThan(
       predictPosition(rolling, T0 + 30_000).lat
+    );
+  });
+
+  it('3000ft 아래(접근 중)에서는 따라가기여도 10초까지만 예측', () => {
+    const approach = aircraft({ altFt: 1500 });
+    expect(predictPosition(approach, T0 + 60_000, 180_000)).toEqual(
+      predictPosition(approach, T0 + LOW_ALTITUDE_PREDICT_MS, 180_000)
     );
   });
 

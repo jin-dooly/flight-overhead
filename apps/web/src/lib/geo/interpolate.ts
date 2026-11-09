@@ -1,5 +1,5 @@
 import type { Aircraft } from '@flight/shared';
-import { isNearGround } from '../altitude';
+import { isLowAltitude, isNearGround } from '../altitude';
 import type { LatLon } from './distance';
 
 /** 위도 1도의 길이(km). 지구 반지름 6371km 기준 */
@@ -34,6 +34,12 @@ const wrapLon = (lon: number) => ((((lon + 180) % 360) + 360) % 360) - 180;
  */
 export const NEAR_GROUND_PREDICT_MS = 3_000;
 
+/**
+ * 저고도(3000ft 아래, 이착륙 접근 중)에서는 이 시간까지만 예측함.
+ * 착륙 직전에 위치가 끊기면 예전에는 따라가기 예측 시간(3분)만큼 공항을 지나쳐 계속 날아갔음(사용자 제보 2026-11-09)
+ */
+export const LOW_ALTITUDE_PREDICT_MS = 10_000;
+
 export const predictPosition = (
   aircraft: Aircraft & { onGround?: boolean },
   atMs: number,
@@ -46,7 +52,11 @@ export const predictPosition = (
   if (onGround) return { lat, lon };
 
   // 시계 오차로 seenAt이 미래일 수 있으므로 0 아래로 내려가지 않게 함
-  const limitMs = isNearGround(altFt) ? Math.min(maxPredictMs, NEAR_GROUND_PREDICT_MS) : maxPredictMs;
+  const limitMs = isNearGround(altFt)
+    ? Math.min(maxPredictMs, NEAR_GROUND_PREDICT_MS)
+    : isLowAltitude(altFt)
+      ? Math.min(maxPredictMs, LOW_ALTITUDE_PREDICT_MS)
+      : maxPredictMs;
   const elapsedMs = Math.min(Math.max(atMs - seenAt, 0), limitMs);
   const km = speedKt * KM_PER_NM * (elapsedMs / 3_600_000);
   const track = (trackDeg * Math.PI) / 180;
