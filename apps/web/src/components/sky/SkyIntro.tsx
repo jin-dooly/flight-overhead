@@ -5,8 +5,7 @@ import { BackIcon } from './skyIcons';
  * 하늘 모드 시작 화면 (목업 SkyPermission). 무엇을 하는지, 센서를 어디에 쓰는지 먼저 알려 줌.
  * iOS는 사용자가 버튼을 눌러야만 방향 센서 권한을 물을 수 있어서, 이 버튼이 그 역할을 함.
  *
- * 지금은 화면(UI)만 만든 단계라 버튼은 센서 권한을 묻지 않고 하늘 화면으로 넘어감.
- * 센서 연결은 다음 작업 (docs/HANDOFF-SKY.md)
+ * 버튼을 누르면 SkyPage가 그 클릭 안에서 바로 센서 권한을 요청함(아이폰 조건)
  */
 export const SkyIntro = ({ onBack, onStart }: { onBack: () => void; onStart: () => void }) => {
   const [starting, setStarting] = useState(false);
