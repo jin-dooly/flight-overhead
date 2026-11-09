@@ -37,7 +37,28 @@ export class RequestSpacer {
   release(at: number): void {
     this.reserved.delete(at);
   }
+
+  /** 다음 빈자리까지 기다림. 외부 요청을 보내기 직전에 부름 */
+  async wait(): Promise<void> {
+    const now = this.now();
+    const at = this.reserve(now);
+    if (at > now) await new Promise((resolve) => setTimeout(resolve, at - now));
+  }
 }
+
+/**
+ * 외부 요청 함수를 감싸서, 부를 때마다 예약표의 빈자리를 기다린 뒤 요청하게 함.
+ *
+ * 예전에는 폴러의 토픽마다(격자마다) 예약표에 줄을 섰는데, 지역 통째 조회로 바꾼 뒤에는 대부분의 격자가
+ * 외부 요청 없이 지역 결과를 다시 쓰기만 함. 그런데도 1.1초씩 줄을 서서, 보는 격자가 늘수록
+ * 지도와 따라가기 갱신이 모두 밀렸음(2026-11-09 발견). 이제 실제로 외부에 나가는 요청만 줄을 섬
+ */
+export const spaced =
+  <A extends unknown[], R>(spacer: RequestSpacer, request: (...args: A) => Promise<R>) =>
+  async (...args: A): Promise<R> => {
+    await spacer.wait();
+    return request(...args);
+  };
 
 /** 한 번 조회한 결과. payload가 null이면 예비 소스까지 실패한 것 */
 export type PollResult<P> =
@@ -54,7 +75,8 @@ export type TopicPollerOptions<K, P> = {
   onStatusChange?: (status: SourceStatus) => void;
   intervalMs: number;
   maxIntervalMs: number;
-  spacer: RequestSpacer;
+  /** 토픽 폴링 시작을 서로 띄울 예약표. null이면 띄우지 않음(외부 요청 쪽에서 간격을 지킬 때) */
+  spacer: RequestSpacer | null;
   /**
    * 한 클라이언트가 동시에 구독할 수 있는 이 폴러의 토픽 수. 넘으면 가장 오래된 구독을 폴링 대상에서 뺌.
    * 따라가기는 1 (기획서: 연결 하나당 따라가기 1개)
@@ -188,7 +210,7 @@ export class TopicPoller<K, P> {
     state.stopped = true;
     if (state.timer) {
       clearTimeout(state.timer);
-      if (state.reservedAt !== null) this.opts.spacer.release(state.reservedAt);
+      if (state.reservedAt !== null) this.opts.spacer?.release(state.reservedAt);
     }
     this.topics.delete(topic);
     this.log(`폴링 중지 ${topic} (활성 ${this.topics.size})`);
@@ -201,14 +223,14 @@ export class TopicPoller<K, P> {
    */
   private schedule(state: TopicState<K>, delayMs: number): void {
     const now = Date.now();
-    const startAt = this.opts.spacer.reserve(now + delayMs);
+    const startAt = this.opts.spacer ? this.opts.spacer.reserve(now + delayMs) : now + delayMs;
     state.timer = setTimeout(() => {
       // 시작한 요청의 예약은 지우지 않음. 직후에 시작하려는 다른 토픽도 간격을 지키게 하려고
       // 잠시 남겨 두고, 지난 예약은 RequestSpacer가 정리함
       state.reservedAt = null;
       void this.poll(state);
     }, startAt - now);
-    state.reservedAt = startAt;
+    state.reservedAt = this.opts.spacer ? startAt : null;
   }
 
   private async poll(state: TopicState<K>): Promise<void> {

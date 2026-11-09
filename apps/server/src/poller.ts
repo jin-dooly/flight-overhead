@@ -17,8 +17,11 @@ export type PollerOptions = {
   radiusNm: number;
   /** 서로 다른 토픽의 요청 시작 사이 최소 간격 (spacer를 넘기지 않을 때만 씀) */
   minRequestGapMs?: number;
-  /** 따라가기 폴러와 요청 간격을 같이 지키려고 공유하는 예약표 */
-  spacer?: RequestSpacer;
+  /**
+   * 격자 폴링 시작을 서로 띄울 예약표. 넘기지 않으면 minRequestGapMs 간격의 새 예약표,
+   * null이면 띄우지 않음(서버에서는 외부 요청 함수 쪽에서 간격을 지키므로 null)
+   */
+  spacer?: RequestSpacer | null;
   now?: () => number;
   log?: (message: string) => void;
 };
@@ -45,7 +48,9 @@ export class GridPoller {
       intervalMs: opts.intervalMs,
       maxIntervalMs: opts.maxIntervalMs,
       spacer:
-        opts.spacer ?? new RequestSpacer(opts.minRequestGapMs ?? 250, opts.now),
+        opts.spacer === undefined
+          ? new RequestSpacer(opts.minRequestGapMs ?? 250, opts.now)
+          : opts.spacer,
       label: '격자',
       log: opts.log,
     });
