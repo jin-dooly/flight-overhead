@@ -2,6 +2,7 @@ import type { FollowSnapshot } from '@flight/shared';
 import { beforeEach, describe, expect, it } from 'vitest';
 import {
   applyFollowSnapshot,
+  markLanded,
   startFollow,
   stopFollow,
   useFollowStore,
@@ -60,5 +61,13 @@ describe('따라가기 스토어', () => {
     expect(useFollowStore.getState().landedAt).toBe(T0 + 6000);
     applyFollowSnapshot(snap(37.52, T0 + 12_000, false));
     expect(useFollowStore.getState().last?.lat).toBe(37.51);
+  });
+
+  it('지상 신호 없이 착륙 확정하면 마지막 위치 시각이 착륙 시각이 되고, 지상으로 표시(예측 멈춤)', () => {
+    applyFollowSnapshot(snap(37.51, T0 + 6000));
+    markLanded();
+    const s = useFollowStore.getState();
+    expect(s.landedAt).toBe(T0 + 6000);
+    expect(s.last?.onGround).toBe(true);
   });
 });

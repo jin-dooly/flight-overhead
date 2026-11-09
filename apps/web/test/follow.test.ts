@@ -1,6 +1,12 @@
 import type { FollowedAircraft } from '@flight/shared';
 import { describe, expect, it } from 'vitest';
-import { FOLLOW_LOST_MS, deriveFollowPhase, formatDuration } from '../src/lib/follow';
+import {
+  FOLLOW_LOST_MS,
+  LANDING_SILENCE_MS,
+  deriveFollowPhase,
+  formatDuration,
+  looksLanded,
+} from '../src/lib/follow';
 import { bearingDeg } from '../src/lib/geo/bearing';
 
 describe('bearingDeg', () => {
@@ -64,5 +70,34 @@ describe('formatDuration', () => {
     expect(formatDuration(58 * 60_000 + 59_000)).toBe('58분');
     expect(formatDuration(60 * 60_000)).toBe('1시간');
     expect(formatDuration(65 * 60_000)).toBe('1시간 5분');
+  });
+});
+
+describe('looksLanded', () => {
+  const T0 = 1_000_000;
+  // 제주공항 북쪽 약 9km 접근 경로, 1200ft에서 마지막 위치
+  const approach = (altFt: number | undefined, lat = 33.59) => ({
+    hex: 'abc123',
+    lat,
+    lon: 126.49,
+    altFt,
+    seenAt: T0,
+    onGround: false,
+  });
+
+  it('공항 15km 안, 2000ft 아래에서 1분 넘게 끊기면 착륙', () => {
+    expect(looksLanded({ last: approach(1200), nowMs: T0 + LANDING_SILENCE_MS + 1 })).toBe(true);
+  });
+
+  it('1분이 안 됐으면 아직 아님', () => {
+    expect(looksLanded({ last: approach(1200), nowMs: T0 + LANDING_SILENCE_MS })).toBe(false);
+  });
+
+  it('높이 있었거나(순항), 고도를 모르거나, 공항에서 멀면 아님', () => {
+    const later = T0 + LANDING_SILENCE_MS * 2;
+    expect(looksLanded({ last: approach(9000), nowMs: later })).toBe(false);
+    expect(looksLanded({ last: approach(undefined), nowMs: later })).toBe(false);
+    expect(looksLanded({ last: approach(1200, 34.5), nowMs: later })).toBe(false); // 제주에서 약 110km
+    expect(looksLanded({ last: null, nowMs: later })).toBe(false);
   });
 });

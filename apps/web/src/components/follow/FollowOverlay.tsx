@@ -1,7 +1,13 @@
 import type { FollowedAircraft } from '@flight/shared';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { useNow } from '../../hooks/useNow';
-import { deriveFollowPhase, FOLLOW_LOST_MS, formatDuration, type FollowPhase } from '../../lib/follow';
+import {
+  deriveFollowPhase,
+  FOLLOW_LOST_MS,
+  formatDuration,
+  looksLanded,
+  type FollowPhase,
+} from '../../lib/follow';
 import {
   formatAgo,
   formatAltitude,
@@ -14,7 +20,7 @@ import { arrivalLabel, departureLabel, describePlace } from '../../lib/airports'
 import { distanceKm } from '../../lib/geo/distance';
 import { predictPosition } from '../../lib/geo/interpolate';
 import { useFlightsStore } from '../../store/flights';
-import { useFollowStore } from '../../store/follow';
+import { markLanded, useFollowStore } from '../../store/follow';
 import { useLocationStore } from '../../store/location';
 import { ArrowIcon, PlaneIcon, TargetIcon, WifiOffIcon } from '../mapUi/icons';
 
@@ -33,6 +39,12 @@ const useFollowView = () => {
     nowMs: serverNowMs,
   });
   const position = follow.last ? predictPosition(follow.last, serverNowMs, FOLLOW_LOST_MS) : null;
+
+  // 공항 근처 저고도에서 1분 넘게 끊기면 착륙으로 확정 (1초마다 확인)
+  const landedByGuess = follow.landedAt === null && looksLanded({ last: follow.last, nowMs: serverNowMs });
+  useEffect(() => {
+    if (landedByGuess) markLanded();
+  }, [landedByGuess]);
   const me = { lat: myLat, lon: myLon };
   return {
     ...follow,

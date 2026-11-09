@@ -51,8 +51,11 @@ export const AIRPORTS: Airport[] = [
   { iata: 'VVO', name: '블라디보스토크국제공항', city: '블라디보스토크', lat: 43.399, lon: 132.148 },
 ];
 
-/** 이 거리 안이면 "그 공항"으로 봄. 활주로 끝이나 유도로에 있어도 같은 공항으로 잡히게 */
-const AT_AIRPORT_KM = 8;
+/**
+ * 이 거리 안이면 "그 공항"으로 봄. 활주로 끝이나 유도로뿐 아니라, 착륙 직전 마지막으로 위치를 받은
+ * 접근 경로(공항 10km 안팎)에서도 같은 공항으로 잡히게 15km
+ */
+export const AT_AIRPORT_KM = 15;
 /** 이 거리 안이면 "그 도시 근처/상공"으로 말함 */
 const NEAR_CITY_KM = 80;
 
@@ -61,8 +64,11 @@ export type Place =
   | { kind: 'near'; airport: Airport }
   | { kind: 'unknown' };
 
-/** 가장 가까운 공항을 기준으로 위치를 말로 바꿈 */
-export const describePlace = (pos: LatLon, airports: readonly Airport[] = AIRPORTS): Place => {
+/** 가장 가까운 공항과 거리 */
+export const nearestAirport = (
+  pos: LatLon,
+  airports: readonly Airport[] = AIRPORTS
+): { airport: Airport; km: number } | null => {
   let best: Airport | null = null;
   let bestKm = Infinity;
   for (const a of airports) {
@@ -72,7 +78,14 @@ export const describePlace = (pos: LatLon, airports: readonly Airport[] = AIRPOR
       bestKm = km;
     }
   }
-  if (!best || bestKm > NEAR_CITY_KM) return { kind: 'unknown' };
+  return best ? { airport: best, km: bestKm } : null;
+};
+
+/** 가장 가까운 공항을 기준으로 위치를 말로 바꿈 */
+export const describePlace = (pos: LatLon, airports: readonly Airport[] = AIRPORTS): Place => {
+  const nearest = nearestAirport(pos, airports);
+  if (!nearest || nearest.km > NEAR_CITY_KM) return { kind: 'unknown' };
+  const { airport: best, km: bestKm } = nearest;
   return bestKm <= AT_AIRPORT_KM ? { kind: 'airport', airport: best } : { kind: 'near', airport: best };
 };
 
