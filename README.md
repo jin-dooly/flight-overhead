@@ -13,13 +13,13 @@
 - 처음 들어오면 내 위치를 요청하고, 권한이 없으면 인천공항 기준으로 보여 줌
 - 상태 표시: 실시간 / 연결 중 / 재연결 중(마지막 위치를 흐리게) / 데이터 지연("N초 전 기준")
 - 반경 안에 비행기가 없으면 가장 가까운 비행기까지의 거리와 "반경 30km까지 넓히기"
-- 데이터 소스 장애 시 adsb.lol → adsb.fi 자동 전환
+- 데이터 소스 장애 시 adsb.fi → adsb.lol 자동 전환
 
 ## 핵심 구현
 
 | 주제 | 어디 | 한 줄 설명 |
 | --- | --- | --- |
-| 격자 토픽으로 호출 공유 | `packages/shared`, `apps/server/src/poller.ts` | 위치를 0.1도 격자로 반올림한 토픽을 구독. 같은 격자 사용자는 서버 조회 하나를 같이 받음 |
+| 지역 통째 조회 | `apps/server/src/sources/regional.ts` | 한반도를 한 번 조회해 0.1도 격자 토픽마다 나눠 발행. 외부 요청 수가 사용자 수와 상관없음 |
 | 예비 전환과 백오프 | `apps/server/src/sources`, `backoff.ts` | 메인 실패 시 예비 소스, 둘 다 실패하면 5→10→20→40→60초 |
 | 보간 애니메이션 | `apps/web/src/lib/geo/interpolate.ts`, `components/map/AircraftLayer.tsx` | React state를 거치지 않고 `requestAnimationFrame`에서 Leaflet 마커를 직접 이동 |
 | 시계 보정 | `apps/web/src/lib/mqtt.ts` | 스냅샷을 받을 때 "내 시계 - 서버 시계"를 기억해, 기기 시계가 틀려도 예측 위치가 어긋나지 않음 |
@@ -33,7 +33,7 @@ apps/web        Vite + React + TypeScript (지도는 react-leaflet, 상태는 zu
 packages/shared 공통 타입(Aircraft, Snapshot), 토픽 이름, 격자 함수
 ```
 
-서버가 공개 ADS-B API(메인 adsb.lol, 예비 adsb.fi)를 격자별로 5초마다 조회하고, 그 격자를 구독한 브라우저들에게 MQTT over WebSocket으로 한 번에 발행합니다. 브라우저는 위치를 0.1도 격자로 반올림한 토픽만 구독하므로 정확한 위치는 서버에도 외부 API에도 전달되지 않습니다.
+서버가 공개 ADS-B API(메인 adsb.fi, 예비 adsb.lol)로 한반도 전체를 5초마다 한 번 조회하고, 격자별로 나눠 그 격자를 구독한 브라우저들에게 MQTT over WebSocket으로 발행합니다. 따라가기 기체는 10초마다 기체 ID로 조회합니다. 브라우저는 위치를 0.1도 격자로 반올림한 토픽만 구독하므로 정확한 위치는 서버에도 외부 API에도 전달되지 않습니다.
 
 | 토픽 | 내용 |
 | --- | --- |
@@ -41,7 +41,7 @@ packages/shared 공통 타입(Aircraft, Snapshot), 토픽 이름, 격자 함수
 | `status/source` | `ok` / `fallback` / `degraded`, retained |
 
 - 구독자가 있는 격자만 폴링하고, 마지막 구독자가 떠나면 멈춥니다.
-- adsb.lol이 실패하면 같은 요청을 adsb.fi로 재시도하고, 둘 다 실패하면 간격을 10초, 20초, 40초, 60초로 늘립니다.
+- adsb.fi가 실패하면 같은 요청을 adsb.lol로 재시도하고, 둘 다 실패하면 간격을 10초, 20초, 40초, 60초로 늘립니다.
 - 브라우저 연결은 구독만 할 수 있고, 발행하면 연결이 끊깁니다.
 
 ## 실행
@@ -77,4 +77,4 @@ pnpm --filter @flight/web dev
 ## 데이터 출처
 
 - 지도: © OpenStreetMap contributors
-- 비행기 위치: [adsb.lol](https://adsb.lol), [adsb.fi](https://adsb.fi) (비상업 용도)
+- 비행기 위치: [adsb.fi](https://adsb.fi), [adsb.lol](https://adsb.lol) (비상업 용도)
