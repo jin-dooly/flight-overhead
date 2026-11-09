@@ -255,3 +255,14 @@ button:disabled {
   background: var(--cell);
   color: var(--text);
 }
+
+/* 하늘 모드 코드를 받는 동안 (App.tsx의 Suspense) */
+.sky-loading {
+  min-height: 100dvh;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--sky-bg);
+  color: #c9d2e3;
+  font-size: 14px;
+}

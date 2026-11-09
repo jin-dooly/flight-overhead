@@ -1,12 +1,11 @@
 import 'leaflet/dist/leaflet.css';
 import '../components/mapUi/mapUi.css';
 import type { Map as LeafletMap } from 'leaflet';
-import { useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useRef, type ReactNode } from 'react';
 import { MapContainer, TileLayer } from 'react-leaflet';
 import { FollowButton } from '../components/follow/FollowButton';
-import { FollowOverlay } from '../components/follow/FollowOverlay';
 import { AircraftLayer } from '../components/map/AircraftLayer';
-import { FollowMapMode, FollowTrail, type TailUpdater } from '../components/map/FollowMapMode';
+import type { TailUpdater } from '../components/map/FollowMapMode';
 import { LocationSync } from '../components/map/MapViewSync';
 import { MyLocationLayer } from '../components/map/MyLocationLayer';
 import { AircraftSheet } from '../components/mapUi/AircraftSheet';
@@ -24,6 +23,18 @@ import { visibleCenter } from '../components/map/visibleCenter';
 import { useFlightsStore } from '../store/flights';
 import { stopFollow, useFollowStore } from '../store/follow';
 import { useLocationStore } from '../store/location';
+
+// 따라가기 화면은 따라가기를 시작할 때 따로 받아 옴(코드 분할). 처음 지도 화면에는 필요 없어서
+// 첫 화면에 받는 JS를 줄이려고 나눔. 받는 동안은 아무것도 안 그림(fallback null) — 미리 받아 두므로 보통 바로 뜸(App.tsx)
+const FollowOverlay = lazy(() =>
+  import('../components/follow/FollowOverlay').then((m) => ({ default: m.FollowOverlay }))
+);
+const FollowMapMode = lazy(() =>
+  import('../components/map/FollowMapMode').then((m) => ({ default: m.FollowMapMode }))
+);
+const FollowTrail = lazy(() =>
+  import('../components/map/FollowMapMode').then((m) => ({ default: m.FollowTrail }))
+);
 
 const MAP_ZOOM = 10; // 폰 세로 화면에서 반경 20km 원이 화면 너비에 맞는 정도 (목업 Main)
 
@@ -117,8 +128,10 @@ export const MapPage = ({
         {following ? (
           // 따라가는 동안에는 그 비행기 하나만 그리고, 매 프레임 지도 중심을 그 비행기에 맞춤
           <>
-            <FollowMapMode />
-            <FollowTrail tailRef={tailRef} />
+            <Suspense fallback={null}>
+              <FollowMapMode />
+              <FollowTrail tailRef={tailRef} />
+            </Suspense>
             <AircraftLayer
               aircraft={followed}
               onSelect={noop}
@@ -144,14 +157,23 @@ export const MapPage = ({
       <div className="map-ui">
         <div className="map-top">
           {following ? (
-            <FollowOverlay placement="top" onExit={onExitFollow} />
+            <Suspense fallback={null}>
+              <FollowOverlay placement="top" onExit={onExitFollow} />
+            </Suspense>
           ) : (
             <TopAndBanner
               count={nearby.hasSnapshot ? nearby.inside.length : null}
               radiusKm={nearby.radiusKm}
             />
           )}
-          {isDesktop && (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
+          {isDesktop &&
+            (following ? (
+              <Suspense fallback={null}>
+                <FollowOverlay placement="sheet" onExit={onExitFollow} />
+              </Suspense>
+            ) : (
+              sheet
+            ))}
         </div>
         {/* 폰에서는 카드를 끌어서 접을 수 있음. 데스크톱은 카드가 왼쪽 패널이라 버튼 줄만 */}
         <DraggableBottom>
@@ -160,7 +182,13 @@ export const MapPage = ({
             <MapControls mapRef={mapRef} zoom={MAP_ZOOM} />
           </div>
           {!isDesktop &&
-            (following ? <FollowOverlay placement="sheet" onExit={onExitFollow} /> : sheet)}
+            (following ? (
+              <Suspense fallback={null}>
+                <FollowOverlay placement="sheet" onExit={onExitFollow} />
+              </Suspense>
+            ) : (
+              sheet
+            ))}
         </DraggableBottom>
       </div>
 
