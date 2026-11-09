@@ -48,8 +48,11 @@ export const createFallbackFetcher = (
   };
 };
 
+// 메인은 adsb.fi, 예비는 adsb.lol (2026-11-09 사용자 결정).
+// adsb.lol은 호출 제한 기준이 공개되지 않았고("부하에 따라 바뀜") 실제로 429가 자주 났음.
+// adsb.fi는 "1초에 1번"으로 기준이 분명해서, 요청 간격을 맞추면 막히지 않음
 export const createDefaultFetcher = (opts: SourceOptions): SnapshotFetcher =>
-  createFallbackFetcher(createAdsbLolSource(opts), createAdsbFiSource(opts));
+  createFallbackFetcher(createAdsbFiSource(opts), createAdsbLolSource(opts));
 
 export type FollowFetcher = (hex: string) => Promise<PollResult<FollowSnapshot>>;
 
@@ -84,7 +87,7 @@ export const createFallbackHexFetcher = (
 };
 
 export const createDefaultFollowFetcher = (opts: SourceOptions): FollowFetcher =>
-  createFallbackHexFetcher(createAdsbLolSource(opts), createAdsbFiSource(opts));
+  createFallbackHexFetcher(createAdsbFiSource(opts), createAdsbLolSource(opts));
 
 const errorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);

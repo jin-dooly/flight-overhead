@@ -15,6 +15,7 @@ import {
   type FollowFetcher,
   type SnapshotFetcher,
 } from './sources';
+import { createRegionalFetcher } from './sources/regional';
 import { RequestSpacer } from './topicPoller';
 
 export type HealthResponse = {
@@ -56,10 +57,17 @@ export const startServer = async (
     userAgent: config.userAgent,
     timeoutMs: config.requestTimeoutMs,
   };
-  // 격자와 따라가기가 같은 외부 API를 부르므로 요청 간격 예약표를 하나로 같이 씀
-  const spacer = new RequestSpacer(250);
+  // 격자와 따라가기가 같은 외부 API를 부르므로 요청 간격 예약표를 하나로 같이 씀.
+  // 간격 1.1초: 메인 adsb.fi의 "1초에 1번" 제한을 넘지 않게
+  const spacer = new RequestSpacer(config.minRequestGapMs);
+  const areaFetcher = fetchSnapshot ?? createDefaultFetcher(sourceOptions);
   const poller = connectPollerToBroker(broker, {
-    fetchSnapshot: fetchSnapshot ?? createDefaultFetcher(sourceOptions),
+    // 지역(한반도) 안 격자는 지역 통째 조회 결과를 나눠 씀. 결과는 격자 폴링 간격보다 조금 짧게 재사용
+    fetchSnapshot: createRegionalFetcher({
+      region: config.region,
+      fetchArea: areaFetcher,
+      ttlMs: Math.max(1000, config.pollIntervalMs - 500),
+    }),
     intervalMs: config.pollIntervalMs,
     maxIntervalMs: config.maxPollIntervalMs,
     radiusNm: config.radiusNm,
@@ -68,7 +76,7 @@ export const startServer = async (
   });
   followPoller = connectFollowPollerToBroker(broker, {
     fetchFollow: fetchFollow ?? createDefaultFollowFetcher(sourceOptions),
-    intervalMs: config.pollIntervalMs,
+    intervalMs: config.followIntervalMs,
     maxIntervalMs: config.maxPollIntervalMs,
     spacer,
     log,
