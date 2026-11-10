@@ -3,7 +3,7 @@
 내 위치 상공(반경 20km)을 지나는 비행기를 지도 위에 실시간으로 보여주는 웹 서비스입니다. 기획 의도와 범위는 [`docs/PLAN.md`](docs/PLAN.md)에 있습니다.
 
 - 서비스: https://flight-overhead.vercel.app
-- 서버: https://flight-overhead.onrender.com/health (Render 무료 플랜이라 한동안 접속이 없으면 잠들어, 첫 접속은 1분 가까이 걸릴 수 있습니다)
+- 서버: https://flight-overhead.onrender.com/health (Render 무료 플랜이라 15분 동안 접속이 없으면 잠들어, 첫 접속은 1분 가까이 걸릴 수 있습니다. 낮 시간에는 cron-job.org가 10분마다 `/health`를 불러 깨워 두고, 새벽에는 무료 사용 시간을 아끼려고 멈춥니다. 서버 상태는 GitHub Actions의 "서버 상태 확인"으로 직접 확인할 수 있습니다)
 
 ## 보간 전후 비교
 

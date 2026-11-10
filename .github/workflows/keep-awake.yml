@@ -1,24 +1,17 @@
-name: 서버 깨워 두기
+name: 서버 상태 확인
 
-# Render 무료 서버는 15분 동안 요청이 없으면 잠들어, 다음 첫 접속이 1분 가까이 걸려요.
-# 10분마다 /health를 불러 깨워 둬요. 예약 실행은 몇 분씩 밀릴 수 있어서 15분보다 넉넉히 짧게 잡았어요.
-# /health는 격자를 만들지 않아서 외부 API(adsb.lol) 요청은 늘지 않아요.
-# 예약 실행은 기본 브랜치(main)에 있는 파일로만 돌아요.
+# 배포 서버(/health)를 손으로 한 번 불러 보는 용도예요. Actions 화면의 Run workflow 버튼으로 실행해요.
+# 서버 깨워 두기는 cron-job.org에서 10분마다 해요(README 참고).
+# 처음에는 여기서 예약 실행(schedule)으로 깨웠지만, GitHub 예약 실행이 몇 시간씩 밀려 서버가 계속 잠들어서 옮겼어요.
 on:
-  schedule:
-    - cron: '*/10 * * * *' # UTC 기준, 10분마다
-  workflow_dispatch: # Actions 화면에서 직접 실행해 볼 수 있게
-
-concurrency:
-  group: keep-awake
-  cancel-in-progress: true
+  workflow_dispatch:
 
 jobs:
   ping:
     runs-on: ubuntu-latest
     timeout-minutes: 3
     steps:
-      # 이미 잠들었으면 깨어나는 데 1분 가까이 걸려서 응답 대기를 넉넉히 둠. 실패하면 30초 뒤 한 번 더
+      # 잠든 서버는 깨어나는 데 1분 가까이 걸려서 응답 대기를 넉넉히 둠. 실패하면 30초 뒤 한 번 더
       - name: 서버 상태 확인
         run: |
           curl -fsS -m 90 https://flight-overhead.onrender.com/health \
