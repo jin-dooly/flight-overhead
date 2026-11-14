@@ -124,6 +124,31 @@ describe('GridPoller 구독 수 추적', () => {
     expect(poller.activeGrids).toBe(0);
   });
 
+  it('마지막 구독자가 떠날 때만 그 격자의 스냅샷 지우기를 부른다', async () => {
+    const cleared: string[] = [];
+    const poller = new GridPoller({
+      fetchSnapshot: async () => okResult(),
+      publishSnapshot: () => {},
+      onStatusChange: () => {},
+      clearSnapshot: (topic) => cleared.push(topic),
+      intervalMs: 5000,
+      maxIntervalMs: 60_000,
+      radiusNm: 15,
+      spacer: null,
+    });
+    poller.subscribe('c1', TOPIC_A);
+    poller.subscribe('c2', TOPIC_A);
+    poller.subscribe('c1', TOPIC_B);
+    await vi.advanceTimersByTimeAsync(0);
+
+    poller.unsubscribe('c1', TOPIC_A);
+    expect(cleared).toEqual([]); // c2가 아직 보고 있음
+    poller.removeClient('c1');
+    expect(cleared).toEqual([TOPIC_B]);
+    poller.unsubscribe('c2', TOPIC_A);
+    expect(cleared).toEqual([TOPIC_B, TOPIC_A]);
+  });
+
   it('상태 토픽 같은 격자 아닌 토픽은 폴링을 시작하지 않는다', () => {
     const { poller } = setup();
     poller.subscribe('c1', 'status/source');

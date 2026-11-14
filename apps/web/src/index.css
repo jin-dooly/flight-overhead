@@ -26,6 +26,13 @@
   --sky-card: #13213f;
   --sky-accent: #9db8ff;
 
+  /* 고도별 비행기 색 (lib/altitude.ts의 ALTITUDE_BANDS). 낮을수록 따뜻한 색, 높을수록 차가운 색.
+     파란색은 선택, 내 위치, 반경 원에 쓰므로 뺌 */
+  --alt-approach: #d85a30;
+  --alt-low: #ba7517;
+  --alt-mid: #1d9e75;
+  --alt-cruise: #534ab7;
+
   --shadow-chip: 0 1px 2px rgba(20, 24, 31, 0.12), 0 4px 12px rgba(20, 24, 31, 0.08);
   --shadow-sheet: 0 -4px 20px rgba(20, 24, 31, 0.1);
   --shadow-panel: 0 1px 2px rgba(20, 24, 31, 0.1), 0 8px 24px rgba(20, 24, 31, 0.1);
@@ -152,6 +159,24 @@ button:disabled {
 .aircraft-marker.is-highlighted .aircraft-label {
   background: var(--accent);
   color: #ffffff;
+}
+
+/* 고도별 색. 선택한 비행기도 고도 색을 유지하고 파란 원과 라벨로 구분함(고도가 없을 때만 위의 파란 아이콘).
+   아래의 흐림/반경 밖 규칙이 이기도록 그보다 먼저 둠 */
+.aircraft-marker[data-alt='approach'] .aircraft-rotor {
+  color: var(--alt-approach);
+}
+
+.aircraft-marker[data-alt='low'] .aircraft-rotor {
+  color: var(--alt-low);
+}
+
+.aircraft-marker[data-alt='mid'] .aircraft-rotor {
+  color: var(--alt-mid);
+}
+
+.aircraft-marker[data-alt='cruise'] .aircraft-rotor {
+  color: var(--alt-cruise);
 }
 
 /* 30초 넘게 새 위치를 못 받은 비행기, 반경 밖의 가장 가까운 비행기, 서버 연결이 끊긴 동안 */

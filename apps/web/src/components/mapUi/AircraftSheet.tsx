@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import { MAX_VIEW_RADIUS_KM } from '../../config';
+import { altitudeBand, altitudeBandName } from '../../lib/altitude';
 import { distanceKm } from '../../lib/geo/distance';
 import { predictPosition } from '../../lib/geo/interpolate';
 import {
@@ -120,7 +121,11 @@ const DetailSheet = ({
       </div>
 
       <div className="stats">
-        <Stat label="고도" value={formatAltitude(a.altFt)} />
+        <Stat
+          label="고도"
+          value={formatAltitude(a.altFt)}
+          labelExtra={<AltitudeTag altFt={a.altFt} />}
+        />
         <Stat label="속도" value={formatSpeed(a.speedKt)} />
         <Stat
           label="방향"
@@ -140,17 +145,38 @@ const DetailSheet = ({
   );
 };
 
+/**
+ * 고도 칸 이름 옆의 색 점과 구간 이름 (예: "● 순항"). 지도 아이콘 색과 같아서,
+ * 범례를 열지 않아도 비행기를 누를 때마다 색의 뜻을 알게 됨
+ */
+const AltitudeTag = ({ altFt }: { altFt?: number }) => {
+  const band = altitudeBand(altFt);
+  if (!band) return null;
+  return (
+    <span className="alt-tag">
+      <span className="alt-dot" data-alt={band} aria-hidden="true" />
+      {altitudeBandName(band)}
+    </span>
+  );
+};
+
 const Stat = ({
   label,
   value,
   icon,
+  labelExtra,
 }: {
   label: string;
   value: DisplayValue | null;
   icon?: ReactNode;
+  /** 칸 이름 오른쪽에 붙는 것 (고도 구간) */
+  labelExtra?: ReactNode;
 }) => (
   <div className="stat">
-    <span className="stat-label">{label}</span>
+    <span className="stat-label">
+      {label}
+      {labelExtra}
+    </span>
     <span className="stat-value">
       {value?.main ?? '-'}
       {icon}

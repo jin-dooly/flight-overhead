@@ -14,8 +14,10 @@ import {
 } from '../../lib/geo/interpolate';
 import { angleDiff } from '../../lib/sky';
 import { serverNow } from '../../store/flights';
+import { altitudeBand } from '../../lib/altitude';
 import {
   createAircraftIcon,
+  setAltitudeBand,
   setCallsign,
   setMarkerClass,
   setRotation,
@@ -119,6 +121,7 @@ export function AircraftLayer({
           setCallsign(entry.marker, a.callsign);
         }
         entry.aircraft = a;
+        setAltitudeBand(entry.marker, altitudeBand(a.altFt));
         setRotation(entry.marker, a.trackDeg);
         entry.rotation = a.trackDeg;
         continue;
@@ -128,6 +131,7 @@ export function AircraftLayer({
         icon: createAircraftIcon(a.callsign),
       }).addTo(map);
       marker.on('click', () => onSelectRef.current(a.hex));
+      setAltitudeBand(marker, altitudeBand(a.altFt));
       setRotation(marker, a.trackDeg);
       setMarkerClass(marker, 'is-highlighted', a.hex === classRef.current.highlightHex);
       setMarkerClass(marker, 'is-outside', a.hex === classRef.current.outsideHex);

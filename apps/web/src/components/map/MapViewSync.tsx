@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { useMap } from 'react-leaflet';
 import { useLocationStore } from '../../store/location';
+import { flyToSafe } from './safeFly';
 import { visibleCenter } from './visibleCenter';
 
 /**
@@ -34,7 +35,7 @@ export const LocationSync = ({ paused = false }: { paused?: boolean }) => {
       if (map.getCenter().distanceTo(target) > 100) map.setView(target, zoom, { animate: false });
     };
     map.on('dragstart', onDragStart);
-    map.flyTo(target, zoom, { duration: 2 });
+    flyToSafe(map, target, zoom, { duration: 2 });
     map.once('moveend', ensureArrived);
     // moveend가 오지 않는 경우(애니메이션이 아예 시작되지 않음)를 위해 애니메이션 시간 뒤에도 한 번 확인
     const timer = setTimeout(ensureArrived, 2500);

@@ -73,6 +73,8 @@ export type TopicPollerOptions<K, P> = {
   publish: (topic: string, payload: P) => void;
   /** 소스 상태가 바뀔 때만 호출됨 (없으면 상태를 알리지 않음) */
   onStatusChange?: (status: SourceStatus) => void;
+  /** 마지막 구독자가 떠나 폴링을 멈춘 직후 호출됨 (예: retained 스냅샷 지우기) */
+  onStop?: (topic: string) => void;
   intervalMs: number;
   maxIntervalMs: number;
   /** 토픽 폴링 시작을 서로 띄울 예약표. null이면 띄우지 않음(외부 요청 쪽에서 간격을 지킬 때) */
@@ -214,6 +216,7 @@ export class TopicPoller<K, P> {
     }
     this.topics.delete(topic);
     this.log(`폴링 중지 ${topic} (활성 ${this.topics.size})`);
+    this.opts.onStop?.(topic);
   }
 
   /**

@@ -1,6 +1,7 @@
 import type { Map as LeafletMap } from 'leaflet';
 import type { RefObject } from 'react';
 import { useLocationStore } from '../../store/location';
+import { flyToSafe } from '../map/safeFly';
 import { visibleCenter } from '../map/visibleCenter';
 import { LocateIcon, MinusIcon, PlusIcon } from './icons';
 
@@ -12,7 +13,7 @@ export const MapControls = ({ mapRef, zoom }: { mapRef: RefObject<LeafletMap | n
   const onLocate = () => {
     const { status, lat, lon, requestLocation } = useLocationStore.getState();
     const map = mapRef.current;
-    if (status === 'granted' && map) map.flyTo(visibleCenter(map, lat, lon, zoom), zoom);
+    if (status === 'granted' && map) flyToSafe(map, visibleCenter(map, lat, lon, zoom), zoom);
     requestLocation(); // 그 사이 이동했을 수 있으니 위치도 다시 확인
   };
 

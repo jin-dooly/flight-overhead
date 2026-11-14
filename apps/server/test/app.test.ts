@@ -113,4 +113,31 @@ describe('서버 통합', () => {
     await client.unsubscribeAsync('flights/37.5/127.1');
     await waitFor(async () => (await health(port)).activeGrids === 0);
   });
+
+  it('폴링을 멈춘 격자의 retained 스냅샷은 지워져서, 다시 구독해도 오래된 스냅샷을 받지 않는다', async () => {
+    const { port } = await start(async () => ({
+      status: 'ok',
+      snapshot: { aircraft: [], source: 'adsb.lol', fetchedAt: 1 },
+    }));
+
+    const first = await connect(port);
+    const firstMessages: string[] = [];
+    first.on('message', (_t, payload) => firstMessages.push(payload.toString()));
+    await first.subscribeAsync('flights/37.5/127.1');
+    await waitFor(() => firstMessages.length === 1);
+    first.end(true);
+    await waitFor(async () => (await health(port)).activeGrids === 0);
+
+    const second = await connect(port);
+    // 다시 구독하면 폴링이 새로 시작돼 새 스냅샷이 오므로, 브로커가 저장해 둔 retained로 온 것만 셈
+    const retained: string[] = [];
+    let fresh = 0;
+    second.on('message', (_t, payload, packet) => {
+      if (packet.retain) retained.push(payload.toString());
+      else fresh += 1;
+    });
+    await second.subscribeAsync('flights/37.5/127.1');
+    await waitFor(() => fresh >= 1);
+    expect(retained).toEqual([]);
+  });
 });

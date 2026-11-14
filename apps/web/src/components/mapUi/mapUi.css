@@ -290,6 +290,128 @@
   background: var(--line);
 }
 
+/* 오른쪽 아래 세로 줄: 고도 범례 버튼, 확대·축소, 내 위치 */
+.map-bottom-right {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 12px;
+}
+
+/* ---------- 고도 범례 (AltitudeLegend) ----------
+   자리는 MapPage에서 정하고, 여기서는 버튼 모양과 펼친 목록이 버튼 기준으로 어디에 뜰지만 정함 */
+
+.altitude-legend {
+  position: relative;
+}
+
+.altitude-legend-toggle {
+  height: 32px;
+  padding: 0 12px;
+  border: none;
+  border-radius: 16px;
+  background: var(--card);
+  box-shadow: var(--shadow-chip);
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-family: inherit;
+  font-size: 13px;
+  font-weight: 500;
+  color: var(--text);
+  cursor: pointer;
+}
+
+.altitude-legend-swatches {
+  display: flex;
+  gap: 2px;
+}
+
+.altitude-legend-panel {
+  position: absolute;
+  z-index: 1;
+  margin: 0;
+  padding: 10px 12px;
+  list-style: none;
+  border-radius: 12px;
+  background: var(--card);
+  box-shadow: var(--shadow-panel);
+  display: grid;
+  gap: 6px;
+  white-space: nowrap;
+  font-size: 12px;
+}
+
+.altitude-legend.opens-up .altitude-legend-panel {
+  bottom: calc(100% + 8px);
+}
+
+.altitude-legend.opens-down .altitude-legend-panel {
+  top: calc(100% + 8px);
+}
+
+.altitude-legend.align-end .altitude-legend-panel {
+  right: 0;
+}
+
+.altitude-legend.align-start .altitude-legend-panel {
+  left: 0;
+}
+
+.altitude-legend-panel li {
+  display: grid;
+  grid-template-columns: 10px auto auto;
+  align-items: center;
+  gap: 6px;
+}
+
+.altitude-legend-name {
+  font-weight: 500;
+  color: var(--text);
+}
+
+.altitude-legend-range {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* 고도 색 점. 범례와 카드가 같이 씀. 색 값은 index.css의 --alt-* 토큰 */
+.alt-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex: none;
+  background: var(--text);
+}
+
+.alt-dot[data-alt='approach'] {
+  background: var(--alt-approach);
+}
+
+.alt-dot[data-alt='low'] {
+  background: var(--alt-low);
+}
+
+.alt-dot[data-alt='mid'] {
+  background: var(--alt-mid);
+}
+
+.alt-dot[data-alt='cruise'] {
+  background: var(--alt-cruise);
+}
+
+/* 카드 고도 칸 이름 옆 "● 순항" */
+.alt-tag {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  font-size: 11px;
+  white-space: nowrap;
+}
+
 .attribution {
   padding: 2px 6px;
   border-radius: 4px;
@@ -472,6 +594,9 @@
 .stat-label {
   font-size: 12px;
   color: var(--text-sub);
+  display: flex;
+  align-items: center;
+  gap: 4px;
 }
 
 .stat-value {
