@@ -1,4 +1,5 @@
 import L from 'leaflet';
+import type { AltitudeBand } from '../../lib/altitude';
 
 // 목업 스타일 가이드의 비행기 실루엣. 위(북쪽)를 보고 있어서 진행 방향 각도를 그대로 회전에 씀
 const PLANE_SVG =
@@ -39,6 +40,17 @@ export function setCallsign(marker: L.Marker, callsign?: string) {
 export function setRotation(marker: L.Marker, trackDeg?: number) {
   const rotor = query(marker, '.aircraft-rotor');
   if (rotor) rotor.style.transform = `rotate(${trackDeg ?? 0}deg)`;
+}
+
+/**
+ * 고도 구간을 `data-alt` 속성으로 붙임. 색은 index.css가 정함(`.aircraft-marker[data-alt=…]`).
+ * 고도가 없으면 속성을 지워 기본색으로 둠
+ */
+export function setAltitudeBand(marker: L.Marker, band: AltitudeBand | null) {
+  const el = marker.getElement();
+  if (!el) return;
+  if (band) el.dataset.alt = band;
+  else delete el.dataset.alt;
 }
 
 /** 강조(`is-highlighted`), 흐림(`is-stale`), 반경 밖(`is-outside`) 같은 상태 클래스를 켜고 끔 */
