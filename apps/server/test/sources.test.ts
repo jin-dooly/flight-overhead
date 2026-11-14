@@ -139,6 +139,24 @@ describe('adsb.lol 어댑터', () => {
     expect(result[1].seenAt).toBe(NOW);
   });
 
+  it('API 키가 있으면 x-api-key로 붙이고, 없으면 붙이지 않는다', async () => {
+    const headersOf = (fetchImpl: ReturnType<typeof vi.fn>) =>
+      (fetchImpl.mock.calls[0] as unknown as [string, RequestInit])[1]
+        .headers as Record<string, string>;
+
+    const withKey = vi.fn(async () => jsonResponse({ ac: [] }));
+    await createAdsbLolSource({
+      ...makeOpts(withKey as typeof fetch),
+      adsbLolApiKey: 'test-key',
+    }).fetchByHex('abc123');
+    expect(headersOf(withKey)['x-api-key']).toBe('test-key');
+    expect(headersOf(withKey)['User-Agent']).toBe('flight-overhead-test/0.1');
+
+    const withoutKey = vi.fn(async () => jsonResponse({ ac: [] }));
+    await createAdsbLolSource(makeOpts(withoutKey as typeof fetch)).fetchAircraft(37.5, 127.1, 15);
+    expect(headersOf(withoutKey)).not.toHaveProperty('x-api-key');
+  });
+
   it('2xx가 아닌 응답은 실패로 처리한다', async () => {
     const source = createAdsbLolSource(
       makeOpts((async () => jsonResponse({}, 429)) as typeof fetch)
@@ -188,5 +206,15 @@ describe('adsb.fi 어댑터', () => {
     expect(result.map((a) => a.hex)).toEqual(['71be12', '~2c1a33']);
     expect(result[0].seenAt).toBe(NOW - 2500);
     expect(result[0].callsign).toBe('KAL1234');
+  });
+
+  it('adsb.lol API 키는 adsb.fi에 보내지 않는다', async () => {
+    const fetchImpl = vi.fn(async () => jsonResponse(adsbFiSample));
+    await createAdsbFiSource({
+      ...makeOpts(fetchImpl as typeof fetch),
+      adsbLolApiKey: 'test-key',
+    }).fetchAircraft(37.5, 127.1, 15);
+    const [, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit];
+    expect(init.headers).not.toHaveProperty('x-api-key');
   });
 });

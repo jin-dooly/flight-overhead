@@ -19,6 +19,8 @@ export type HexSource = {
 export type SourceOptions = {
   userAgent: string;
   timeoutMs: number;
+  /** adsb.lol API 키. 있으면 adsb.lol 요청에만 `x-api-key`로 붙임(adsb.fi에는 보내지 않음) */
+  adsbLolApiKey?: string;
   /** 테스트에서 가짜 fetch를 넣기 위한 주입점 */
   fetchImpl?: typeof fetch;
   now?: () => number;

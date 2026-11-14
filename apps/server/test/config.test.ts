@@ -29,4 +29,10 @@ describe('loadConfig', () => {
     expect(config.radiusNm).toBe(21);
     expect(config.userAgent).toBe('my-agent/1.0');
   });
+
+  it('adsb.lol API 키는 앞뒤 공백을 지우고, 비어 있으면 없는 것으로 본다', () => {
+    expect(loadConfig({}).adsbLolApiKey).toBeUndefined();
+    expect(loadConfig({ ADSB_LOL_API_KEY: '   ' }).adsbLolApiKey).toBeUndefined();
+    expect(loadConfig({ ADSB_LOL_API_KEY: ' test-key ' }).adsbLolApiKey).toBe('test-key');
+  });
 });

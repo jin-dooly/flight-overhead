@@ -56,6 +56,7 @@ export const startServer = async (
   const sourceOptions = {
     userAgent: config.userAgent,
     timeoutMs: config.requestTimeoutMs,
+    adsbLolApiKey: config.adsbLolApiKey,
   };
   // 외부 API 요청 사이 간격 예약표 하나를 격자와 따라가기가 같이 씀.
   // 간격 1.1초: 예비 adsb.fi의 "1초에 1번" 제한을 넘지 않게. 메인 adsb.lol의 호출 제한에도 여유를 줌.

@@ -21,6 +21,8 @@ log(
 log(
   `폴링 ${config.pollIntervalMs}ms, 반경 ${config.radiusNm}nm, User-Agent "${config.userAgent}"`
 );
+// 키 값은 남기지 않고 있는지만 알림
+log(`adsb.lol API 키 ${config.adsbLolApiKey ? '있음' : '없음'}`);
 
 let shuttingDown = false;
 const shutdown = (signal: string) => {

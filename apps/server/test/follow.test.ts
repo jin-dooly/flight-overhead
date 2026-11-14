@@ -129,6 +129,19 @@ describe('따라가기 예비 전환', () => {
     const result = await createFallbackHexFetcher(ok('adsb.lol', null), ok('adsb.fi'), () => NOW)(HEX);
     expect(result).toMatchObject({ status: 'ok', payload: { aircraft: null } });
   });
+
+  it('번갈아 부르기: 부를 때마다 먼저 시도하는 소스가 바뀌고, 실패하면 다른 소스로 fallback', async () => {
+    const lol = ok('adsb.lol');
+    const fi = failing('adsb.fi');
+    const fetcher = createFallbackHexFetcher(lol, fi, () => NOW, { alternate: true });
+
+    const first = await fetcher(HEX);
+    const second = await fetcher(HEX);
+
+    expect(first).toMatchObject({ status: 'ok', payload: { source: 'adsb.lol' } });
+    expect(second).toMatchObject({ status: 'fallback', payload: { source: 'adsb.lol' } });
+    expect(fi.fetchByHex).toHaveBeenCalledTimes(1);
+  });
 });
 
 describe('TopicPoller 클라이언트당 토픽 수 상한', () => {

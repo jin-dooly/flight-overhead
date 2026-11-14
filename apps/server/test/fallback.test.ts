@@ -75,6 +75,53 @@ describe('createFallbackFetcher', () => {
   });
 });
 
+describe('createFallbackFetcher 번갈아 부르기', () => {
+  it('부를 때마다 먼저 시도하는 소스를 바꾸고, 먼저 시도한 소스가 성공하면 ok다', async () => {
+    const lol = okSource('adsb.lol');
+    const fi = okSource('adsb.fi');
+    const fetcher = createFallbackFetcher(lol, fi, () => 42, { alternate: true });
+
+    const results = [];
+    for (let i = 0; i < 4; i++) results.push(await fetcher(37.5, 127.1, 15));
+
+    expect(results.map((r) => [r.status, r.snapshot?.source])).toEqual([
+      ['ok', 'adsb.lol'],
+      ['ok', 'adsb.fi'],
+      ['ok', 'adsb.lol'],
+      ['ok', 'adsb.fi'],
+    ]);
+    expect(lol.fetchAircraft).toHaveBeenCalledTimes(2);
+    expect(fi.fetchAircraft).toHaveBeenCalledTimes(2);
+  });
+
+  it('먼저 시도한 소스가 실패하면 같은 요청을 다른 소스로 재시도하고 fallback이다', async () => {
+    const lol = okSource('adsb.lol');
+    const fi = failingSource('adsb.fi');
+    const fetcher = createFallbackFetcher(lol, fi, () => 42, { alternate: true });
+
+    const first = await fetcher(37.5, 127.1, 15); // adsb.lol 차례
+    const second = await fetcher(37.5, 127.1, 15); // adsb.fi 차례 → 실패 → adsb.lol
+
+    expect(first.status).toBe('ok');
+    expect(second.status).toBe('fallback');
+    expect(second.snapshot?.source).toBe('adsb.lol');
+    expect(fi.fetchAircraft).toHaveBeenCalledTimes(1);
+    expect(lol.fetchAircraft).toHaveBeenCalledTimes(2);
+  });
+
+  it('둘 다 실패하면 시도한 순서대로 오류를 모은다', async () => {
+    const fetcher = createFallbackFetcher(failingSource('adsb.lol'), failingSource('adsb.fi'), Date.now, {
+      alternate: true,
+    });
+    await fetcher(37.5, 127.1, 15);
+    const result = await fetcher(37.5, 127.1, 15);
+    expect(result).toMatchObject({
+      status: 'degraded',
+      errors: ['adsb.fi: HTTP 503', 'adsb.lol: HTTP 503'],
+    });
+  });
+});
+
 describe('nextPollDelay', () => {
   it('실패가 없으면 기본 간격', () => {
     expect(nextPollDelay(0, 5000, 60_000)).toBe(5000);

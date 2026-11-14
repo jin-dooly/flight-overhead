@@ -4,7 +4,7 @@ import type { AircraftSource, HexSource, SourceOptions } from './types';
 
 export const ADSB_FI_BASE = 'https://opendata.adsb.fi/api/v2';
 
-/** 예비 소스. 비행기 목록 키는 `aircraft` */
+/** 비행기 목록 키는 `aircraft`(hex 조회 응답은 `ac`). adsb.lol과 번갈아 부름(sources/index.ts) */
 export const createAdsbFiSource = (
   opts: SourceOptions
 ): AircraftSource & HexSource => ({
