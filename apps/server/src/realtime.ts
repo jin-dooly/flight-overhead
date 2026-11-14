@@ -36,7 +36,7 @@ export const publishRetained = (
  */
 export const connectPollerToBroker = (
   broker: Aedes,
-  opts: Omit<PollerOptions, 'publishSnapshot' | 'onStatusChange'>
+  opts: Omit<PollerOptions, 'publishSnapshot' | 'onStatusChange' | 'clearSnapshot'>
 ): GridPoller => {
   const log = opts.log ?? (() => {});
   const poller = new GridPoller({
@@ -50,6 +50,15 @@ export const connectPollerToBroker = (
       log(`소스 상태 변경: ${status}`);
       publishRetained(broker, STATUS_TOPIC, status).catch((err) =>
         log(`상태 발행 실패: ${String(err)}`)
+      );
+    },
+    // 아무도 안 보는 격자의 마지막 스냅샷을 남겨 두면, 나중에 다시 구독한 사람이 오래된 비행기를
+    // 먼저 보게 되고 브로커 메모리에도 격자 수만큼 쌓임(2026-11-14 결정). 빈 payload의 retained
+    // 발행은 MQTT 규칙상 "retained 지우기"이고, Aedes 기본 저장소(aedes-persistence)도 그렇게 처리함.
+    // 따라가기 토픽은 지우지 않음: 다른 기체로 바꾼 클라이언트가 이전 토픽을 아직 구독하고 있을 수 있음
+    clearSnapshot: (topic) => {
+      publishRetained(broker, topic, '').catch((err) =>
+        log(`스냅샷 지우기 실패 ${topic}: ${String(err)}`)
       );
     },
   });

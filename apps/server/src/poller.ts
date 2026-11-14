@@ -12,6 +12,8 @@ export type PollerOptions = {
   publishSnapshot: (topic: string, snapshot: Snapshot) => void;
   /** 소스 상태가 바뀔 때만 호출됨 */
   onStatusChange: (status: SourceStatus) => void;
+  /** 격자 폴링을 멈춘 직후 호출됨. 그 격자의 retained 스냅샷을 지우는 데 씀 */
+  clearSnapshot?: (topic: string) => void;
   intervalMs: number;
   maxIntervalMs: number;
   radiusNm: number;
@@ -45,6 +47,7 @@ export class GridPoller {
       },
       publish: opts.publishSnapshot,
       onStatusChange: opts.onStatusChange,
+      onStop: opts.clearSnapshot,
       intervalMs: opts.intervalMs,
       maxIntervalMs: opts.maxIntervalMs,
       spacer:
