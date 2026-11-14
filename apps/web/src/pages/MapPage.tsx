@@ -20,6 +20,7 @@ import { FOLLOW_LOST_MS } from '../lib/follow';
 import { useDataStatus, useNearby } from '../hooks/useMapData';
 import { useMediaQuery } from '../hooks/useMediaQuery';
 import { boundsAround, type LatLon } from '../lib/geo/distance';
+import { flyToBoundsSafe, flyToSafe } from '../components/map/safeFly';
 import { visibleCenter } from '../components/map/visibleCenter';
 import { useFlightsStore } from '../store/flights';
 import { stopFollow, useFollowStore } from '../store/follow';
@@ -74,7 +75,7 @@ export const MapPage = ({
     const map = mapRef.current;
     if (!map) return;
     const { lat, lon } = useLocationStore.getState();
-    map.flyTo(visibleCenter(map, lat, lon, MAP_ZOOM), MAP_ZOOM, { duration: 1.5 });
+    flyToSafe(map, visibleCenter(map, lat, lon, MAP_ZOOM), MAP_ZOOM, { duration: 1.5 });
   };
 
   // 고른 비행기가 반경 밖으로 나가거나 사라지면 선택을 풀어서, 다시 들어와도 갑자기 선택되지 않게 함
@@ -98,9 +99,11 @@ export const MapPage = ({
   const onWiden = () => {
     useFlightsStore.setState({ radiusKm: MAX_VIEW_RADIUS_KM });
     const { lat, lon } = useLocationStore.getState();
-    mapRef.current?.flyToBounds(boundsAround({ lat, lon }, MAX_VIEW_RADIUS_KM), {
-      duration: 1,
-    });
+    if (mapRef.current) {
+      flyToBoundsSafe(mapRef.current, boundsAround({ lat, lon }, MAX_VIEW_RADIUS_KM), {
+        duration: 1,
+      });
+    }
   };
 
   const sheet = (
