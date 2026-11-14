@@ -305,26 +305,32 @@
   position: relative;
 }
 
+/* 아래 내 위치 버튼(.round-button)과 같은 48px 원형. 글자 없이 2×2 색 점만 있는 단추 모양 */
 .altitude-legend-toggle {
-  height: 32px;
-  padding: 0 12px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
   border: none;
-  border-radius: 16px;
+  border-radius: 50%;
   background: var(--card);
-  box-shadow: var(--shadow-chip);
+  box-shadow:
+    0 1px 2px rgba(20, 24, 31, 0.12),
+    0 4px 12px rgba(20, 24, 31, 0.1);
   display: flex;
   align-items: center;
-  gap: 6px;
-  font-family: inherit;
-  font-size: 13px;
-  font-weight: 500;
-  color: var(--text);
+  justify-content: center;
   cursor: pointer;
 }
 
 .altitude-legend-swatches {
-  display: flex;
-  gap: 2px;
+  display: grid;
+  grid-template-columns: repeat(2, 10px);
+  gap: 4px;
+}
+
+.altitude-legend-swatches .alt-dot {
+  width: 10px;
+  height: 10px;
 }
 
 .altitude-legend-panel {

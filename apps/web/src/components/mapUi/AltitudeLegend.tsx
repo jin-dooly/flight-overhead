@@ -41,14 +41,16 @@ export const AltitudeLegend = ({
         className="altitude-legend-toggle"
         aria-expanded={open}
         aria-controls="altitude-legend-list"
+        aria-label="고도 범례"
+        title="고도 범례"
         onClick={() => setOpen((v) => !v)}
       >
+        {/* 글자 없이 단추처럼 2×2 색 점만 둠. ALTITUDE_BANDS가 높은 순이라 윗줄이 순항·중고도, 아랫줄이 저고도·이착륙 */}
         <span className="altitude-legend-swatches" aria-hidden="true">
           {ALTITUDE_BANDS.map((b) => (
             <span key={b.band} className="alt-dot" data-alt={b.band} />
           ))}
         </span>
-        고도
       </button>
     </div>
   );
